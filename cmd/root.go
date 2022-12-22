@@ -7,6 +7,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	cachePath   string
+	enableDebug bool
+)
+
+const (
+	defaultPath = "cache"
+)
+
 // NewRootCommand creates a new root cli command instance
 func NewRootCommand() *cobra.Command {
 	c := &cobra.Command{
@@ -16,6 +25,8 @@ func NewRootCommand() *cobra.Command {
 		Long: `
 Complete documentation is available at https://github.com/ganto/pkgproxy`,
 	}
+	c.PersistentFlags().StringVar(&cachePath, "path", defaultPath, "cache base path")
+	c.PersistentFlags().BoolVar(&enableDebug, "debug", false, "enable debugging")
 	c.AddCommand(newServeCommand())
 
 	return c

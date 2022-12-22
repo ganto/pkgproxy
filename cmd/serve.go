@@ -6,13 +6,13 @@ import (
 )
 
 var (
-	proxyHost string
-	proxyPort uint16
+	listenAddress string
+	listenPort    uint16
 )
 
 const (
-	defaultHost = "localhost"
-	defaultPort = 8080
+	defaultAddress = "localhost"
+	defaultPort    = 8080
 )
 
 func newServeCommand() *cobra.Command {
@@ -21,13 +21,16 @@ func newServeCommand() *cobra.Command {
 		Args:  cobra.ArbitraryArgs,
 		Short: "Start reverse proxy",
 		Run: func(cmd *cobra.Command, args []string) {
-			host, _ := cmd.Flags().GetString("proxyHost")
+			enableDebug, _ := cmd.Flags().GetBool("debug")
+			path, _ := cmd.Flags().GetString("path")
+			host, _ := cmd.Flags().GetString("host")
 			port, _ := cmd.Flags().GetUint16("port")
-			pkgproxy.StartServer(host, port)
+			pkgproxy.StartServer(enableDebug, path, host, port)
 		},
+		TraverseChildren: true,
 	}
-	c.PersistentFlags().StringVar(&proxyHost, "proxyHost", defaultHost, "host of the reverse proxy.")
-	c.PersistentFlags().Uint16Var(&proxyPort, "port", defaultPort, "local port of the reverse proxy.")
+	c.PersistentFlags().StringVar(&listenAddress, "host", defaultAddress, "listen address of the pkgproxy.")
+	c.PersistentFlags().Uint16Var(&listenPort, "port", defaultPort, "listen port of the pkgproxy.")
 
 	return c
 }

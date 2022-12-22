@@ -1,24 +1,31 @@
 package pkgproxy
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
 	"strings"
 
+	"github.com/ganto/pkgproxy/pkg/cache"
 	"github.com/ganto/pkgproxy/pkg/utils"
 )
 
 type pkgProxyTransport struct {
-	host             string
-	rt               http.RoundTripper
-	cachedFileSuffix []string
+	host  string
+	rt    http.RoundTripper
+	cache cache.Cache
 }
 
 func (ppt pkgProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	reqUri := strings.Clone(req.RequestURI)
+
+	if ppt.cache.IsCacheCandidate(reqUri) {
+		if ppt.cache.IsCached(reqUri) {
+			fmt.Println("read from cache: needs implementation!")
+		}
+	}
+
+	// either the file must not be cached or it's not in the cache yet
+	// therefore send out request
 	setRequestHeaders(req, ppt.host)
 	rsp, err := ppt.rt.RoundTrip(req)
 	if err != nil {
@@ -32,8 +39,12 @@ func (ppt pkgProxyTransport) RoundTrip(req *http.Request) (*http.Response, error
 		}
 	}
 
-	if err := handleResponse(rsp, ppt.cachedFileSuffix); err != nil {
-		return nil, err
+	// save payload in cache directory
+	if ppt.cache.IsCacheCandidate(reqUri) && !ppt.cache.IsCached(reqUri) {
+		if err = ppt.cache.SaveToDisk(reqUri, rsp); err != nil {
+			// don't fail request if we cannot write to cache
+			fmt.Printf("Error: %s", err.Error())
+		}
 	}
 
 	return rsp, nil
@@ -88,69 +99,6 @@ func updateResponse(src *http.Response, dst *http.Response) error {
 	}
 	for _, header := range utils.ListDifference(srcHeaders, dstHeaders) {
 		dst.Header.Add(header, src.Header.Get(header))
-	}
-
-	return nil
-}
-
-func handleResponse(rsp *http.Response, saveSuffixes []string) error {
-	urlPath := "pub/fedora"
-
-	reqFile := utils.FilenameFromUrl(rsp.Request.URL)
-	mustCache := false
-	for _, suffix := range saveSuffixes {
-		if strings.HasSuffix(reqFile, suffix) && rsp.ContentLength > 0 {
-			mustCache = true
-			break
-		}
-	}
-	if mustCache {
-		cacheBasePath := "cache"
-		cacheRepoPath := cacheBasePath + "/" + urlPath
-
-		filename := cacheRepoPath + "/" + reqFile
-		skipSave := false
-		if _, err := os.Stat(cacheRepoPath); errors.Is(err, os.ErrNotExist) {
-			err := os.MkdirAll(cacheRepoPath, os.ModePerm)
-			if err != nil {
-				skipSave = true
-			}
-		}
-		if _, err := os.Stat(filename); err == nil {
-			skipSave = true
-		}
-
-		// write file to disk
-		if !skipSave {
-
-			payload, err := io.ReadAll(rsp.Body)
-			if err != nil {
-				return err
-			}
-			err = rsp.Body.Close()
-			if err != nil {
-				return err
-			}
-			body := io.NopCloser(bytes.NewReader(payload))
-			rsp.Body = body
-
-			fmt.Printf("writing file '%s': ", filename)
-			cacheFile, err := os.Create(filename)
-			if err == nil {
-				defer cacheFile.Close()
-				size, err := cacheFile.ReadFrom(bytes.NewReader(payload))
-				if err != nil {
-					fmt.Printf("\nerror when writing file: %s\n", err.Error())
-				} else {
-					if size != rsp.ContentLength {
-						fmt.Printf("\nerror: could not write entire file size: %d != %d\n", size, rsp.ContentLength)
-						os.Remove(filename)
-					} else {
-						fmt.Printf("%d bytes written\n", size)
-					}
-				}
-			}
-		}
 	}
 
 	return nil

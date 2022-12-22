@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"net/url"
 	"strings"
 )
 
@@ -52,20 +51,37 @@ func ListIntersection[T comparable](a []T, b []T) []T {
 	return set
 }
 
-// Return the filename part of a URL
-//
-// Filename is specified as the last section of the path that is not followed
-// by a `/`
-func FilenameFromUrl(url *url.URL) string {
+// FilenameFromUri returns the last element of an URI
+// If the URI is empty, FilenameFromUri returns "/".
+func FilenameFromUri(uri string) string {
 	file := "/"
 
-	if url.Path[len(url.Path)-1:] == "/" {
+	if len(uri) == 0 || uri[len(uri)-1:] == "/" {
 		return file
 	}
-	path := strings.Split(url.Path, "/")
+	path := strings.Split(uri, "/")
 	if len(path) > 0 {
 		file = path[len(path)-1]
 	}
 
 	return file
+}
+
+// FilepathFromUri returns all but the last element of an URI
+// If the URI is empty, FilepathFromUri returns "/".
+func FilepathFromUri(uri string) string {
+	path := "/"
+
+	if len(uri) == 0 {
+		return path
+	}
+	fullPath := strings.Split(uri, "/")
+	if len(fullPath) > 0 {
+		path = strings.Join(fullPath[0:len(fullPath)-1], "/")
+		if path == "" {
+			path = "/"
+		}
+	}
+
+	return path
 }

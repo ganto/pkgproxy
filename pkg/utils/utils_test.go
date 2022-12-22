@@ -41,24 +41,52 @@ func TestListIntersection(t *testing.T) {
 	assert.Equal(t, i, []int{2})
 }
 
-func TestFilenameFromUrl(t *testing.T) {
+func TestFilenameFromUri(t *testing.T) {
 	s := "http://foo.bar/foobar?foo#bar"
 	u, _ := url.Parse(s)
-	f := FilenameFromUrl(u)
+	f := FilenameFromUri(u.Path)
 	assert.Equal(t, f, "foobar")
 
 	s = "http://foob.ar/foo.bar"
 	u, _ = url.Parse(s)
-	f = FilenameFromUrl(u)
+	f = FilenameFromUri(u.Path)
 	assert.Equal(t, f, "foo.bar")
 
 	s = "http://foob.ar/foo.bar/"
 	u, _ = url.Parse(s)
-	f = FilenameFromUrl(u)
+	f = FilenameFromUri(u.Path)
 	assert.Equal(t, f, "/")
 
 	s = "http://foo.bar/"
 	u, _ = url.Parse(s)
-	f = FilenameFromUrl(u)
+	f = FilenameFromUri(u.Path)
+	assert.Equal(t, f, "/")
+
+	f = FilenameFromUri("")
+	assert.Equal(t, f, "/")
+}
+
+func TestFilepathFromUri(t *testing.T) {
+	s := "http://foo.bar/foobaz/foobar?foo#bar"
+	u, _ := url.Parse(s)
+	f := FilepathFromUri(u.Path)
+	assert.Equal(t, f, "/foobaz")
+
+	s = "http://foob.ar/foo.bar"
+	u, _ = url.Parse(s)
+	f = FilepathFromUri(u.Path)
+	assert.Equal(t, f, "/")
+
+	s = "http://foob.ar/foo.bar/"
+	u, _ = url.Parse(s)
+	f = FilepathFromUri(u.Path)
+	assert.Equal(t, f, "/foo.bar")
+
+	s = "http://foo.bar/"
+	u, _ = url.Parse(s)
+	f = FilepathFromUri(u.Path)
+	assert.Equal(t, f, "/")
+
+	f = FilepathFromUri("")
 	assert.Equal(t, f, "/")
 }
