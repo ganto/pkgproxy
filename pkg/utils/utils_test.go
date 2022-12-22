@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/bmizerany/assert"
@@ -38,4 +39,26 @@ func TestListIntersection(t *testing.T) {
 
 	i = ListIntersection([]int{1, 2}, []int{2, 3})
 	assert.Equal(t, i, []int{2})
+}
+
+func TestFilenameFromUrl(t *testing.T) {
+	s := "http://foo.bar/foobar?foo#bar"
+	u, _ := url.Parse(s)
+	f := FilenameFromUrl(u)
+	assert.Equal(t, f, "foobar")
+
+	s = "http://foob.ar/foo.bar"
+	u, _ = url.Parse(s)
+	f = FilenameFromUrl(u)
+	assert.Equal(t, f, "foo.bar")
+
+	s = "http://foob.ar/foo.bar/"
+	u, _ = url.Parse(s)
+	f = FilenameFromUrl(u)
+	assert.Equal(t, f, "/")
+
+	s = "http://foo.bar/"
+	u, _ = url.Parse(s)
+	f = FilenameFromUrl(u)
+	assert.Equal(t, f, "/")
 }
