@@ -16,17 +16,12 @@ type pkgProxyTransport struct {
 }
 
 func (ppt pkgProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	reqUri := strings.Clone(req.RequestURI)
-
-	if ppt.cache.IsCacheCandidate(reqUri) {
-		if ppt.cache.IsCached(reqUri) {
-			fmt.Println("read from cache: needs implementation!")
-		}
-	}
-
-	// either the file must not be cached or it's not in the cache yet
-	// therefore send out request
 	setRequestHeaders(req, ppt.host)
+
+	// save original request details for potential redirect and later caching
+	reqUri := strings.Clone(req.RequestURI)
+	reqHeaders := req.Header
+
 	rsp, err := ppt.rt.RoundTrip(req)
 	if err != nil {
 		return nil, err
@@ -34,7 +29,7 @@ func (ppt pkgProxyTransport) RoundTrip(req *http.Request) (*http.Response, error
 
 	// follow HTTP 301/302 redirects
 	if rsp.StatusCode == 301 || rsp.StatusCode == 302 {
-		if err := followRedirect(rsp); err != nil {
+		if err := followRedirect(rsp, reqHeaders); err != nil {
 			return nil, err
 		}
 	}
@@ -62,13 +57,20 @@ func setRequestHeaders(req *http.Request, host string) {
 
 // Read redirect location from response, send request to new location and
 // replace original response with response from new location
-func followRedirect(rsp *http.Response) error {
+func followRedirect(rsp *http.Response, headers http.Header) error {
 	location, err := rsp.Location()
 	if err != nil {
 		return err
 	}
 
-	r, err := http.Get(location.String())
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodGet, location.String(), nil)
+	if err != nil {
+		return err
+	}
+	updateHttpHeaders(&headers, &req.Header)
+
+	r, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -78,7 +80,7 @@ func followRedirect(rsp *http.Response) error {
 }
 
 // Overwrite existing response with another response
-func updateResponse(src *http.Response, dst *http.Response) error {
+func updateResponse(src *http.Response, dst *http.Response) {
 	dst.ProtoMajor = src.ProtoMajor
 	dst.ProtoMinor = src.ProtoMinor
 	dst.Request.Host = src.Request.Host
@@ -88,18 +90,21 @@ func updateResponse(src *http.Response, dst *http.Response) error {
 	dst.ContentLength = src.ContentLength
 	dst.Body = src.Body
 
-	srcHeaders := utils.KeysFromMap(src.Header)
-	dstHeaders := utils.KeysFromMap(dst.Header)
+	updateHttpHeaders(&src.Header, &dst.Header)
+}
+
+// Overwrite existing HTTP headers with given headers
+func updateHttpHeaders(src *http.Header, dst *http.Header) {
+	srcHeaders := utils.KeysFromMap(*src)
+	dstHeaders := utils.KeysFromMap(*dst)
 
 	for _, header := range utils.ListIntersection(srcHeaders, dstHeaders) {
-		dst.Header.Set(header, src.Header.Get(header))
+		dst.Set(header, src.Get(header))
 	}
 	for _, header := range utils.ListDifference(dstHeaders, srcHeaders) {
-		dst.Header.Del(header)
+		dst.Del(header)
 	}
 	for _, header := range utils.ListDifference(srcHeaders, dstHeaders) {
-		dst.Header.Add(header, src.Header.Get(header))
+		dst.Add(header, src.Get(header))
 	}
-
-	return nil
 }

@@ -26,7 +26,7 @@ type pkgCache struct {
 
 type PkgCacheConfig struct {
 	FileSuffixes []string
-	Path         string
+	BasePath     string
 }
 
 func NewPkgCache(name string, cfg *PkgCacheConfig) Cache {
@@ -55,7 +55,7 @@ func (pc *pkgCache) IsCacheCandidate(uri string) bool {
 func (pc *pkgCache) IsCached(uri string) bool {
 	c := false
 
-	cachePath := pc.config.Path + "/" + utils.FilepathFromUri(uri)
+	cachePath := path.Join(pc.config.BasePath, uri)
 	if _, err := os.Stat(cachePath); err == nil {
 		c = true
 	}
@@ -65,7 +65,7 @@ func (pc *pkgCache) IsCached(uri string) bool {
 
 // Saves response body to cache
 func (pc *pkgCache) SaveToDisk(uri string, rsp *http.Response) error {
-	cachePath := path.Join(pc.config.Path, utils.FilepathFromUri(uri), utils.FilenameFromUri(uri))
+	cachePath := path.Join(pc.config.BasePath, uri)
 
 	if _, err := os.Stat(path.Dir(cachePath)); errors.Is(err, os.ErrNotExist) {
 		if err := os.MkdirAll(path.Dir(cachePath), os.ModePerm); err != nil {
