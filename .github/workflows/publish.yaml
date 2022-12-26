@@ -17,4 +17,4 @@ jobs:
 
       - uses: imjasonh/setup-ko@v0.6
 
-      - run: ko build
+      - run: KO_DATA_DATE_EPOCH=$(git log -1 --format='%ct') ko build --bare

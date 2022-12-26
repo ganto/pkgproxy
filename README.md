@@ -9,8 +9,20 @@ An example repository configuration can be found at [config/pkgproxy.yaml](confi
 
 ## Run the code
 
+Build and run the code locally for testing:
 ```shell
 PKGPROXY_CONFIG=./configs/pkgproxy.yaml go run github.com/ganto/pkgproxy serve
+```
+
+Run the application via a container engine (e.g. [Podman](https://podman.io/)):
+
+- Using the default repository configuration:
+```shell
+podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z ghcr.io/ganto/pkgproxy serve --host 0.0.0.0 --config \$KO_DATA_PATH/pkgproxy.yaml
+```
+- Mounting your own local `pkgproxy.yaml`:
+```shell
+podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z --volume ./pkgproxy.yaml:/ko-app/pkgproxy.yaml ghcr.io/ganto/pkgproxy serve --host 0.0.0.0 --config /ko-app/pkgproxy.yaml
 ```
 
 ## License
