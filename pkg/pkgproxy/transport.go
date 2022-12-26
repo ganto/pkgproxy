@@ -10,14 +10,11 @@ import (
 )
 
 type PkgProxyTransport struct {
-	Host  string
 	Rt    http.RoundTripper
 	Cache cache.Cache
 }
 
 func (ppt PkgProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	setRequestHeaders(req, ppt.Host)
-
 	// save original request details for potential redirect and later caching
 	reqUri := strings.Clone(req.RequestURI)
 	reqHeaders := req.Header
@@ -43,16 +40,6 @@ func (ppt PkgProxyTransport) RoundTrip(req *http.Request) (*http.Response, error
 	}
 
 	return rsp, nil
-}
-
-// Adjust HTTP request headers
-// - Add correct `Host` header for upstream destination
-// - Remove proxy headers to avoid giving off network internals
-func setRequestHeaders(req *http.Request, host string) {
-	req.Host = host
-	req.Header.Del("X-Real-Ip")
-	req.Header.Del("X-Forwarded-For")
-	req.Header.Del("X-Forwarded-Proto")
 }
 
 // Read redirect location from response, send request to new location and

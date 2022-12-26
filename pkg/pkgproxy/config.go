@@ -46,14 +46,14 @@ func validateConfig(config *Config) error {
 		return errors.New("missing required key 'repositories'")
 	}
 	for handle, repoConfig := range config.Repositories {
-		if alphanum := regexp.MustCompile("^[a-zA-Z0-9]*$").MatchString(handle); !alphanum {
-			return errors.New(fmt.Sprintf("invalid repository name '%s'. Must be alphanumeric.", handle))
+		if alphanum := regexp.MustCompile("^[a-zA-Z0-9_~.-]*$").MatchString(handle); !alphanum {
+			return fmt.Errorf("invalid repository name '%s'. Must be alphanumeric or in '-', '_', '.', '~'", handle)
 		}
 		if repoConfig.Suffixes == nil {
-			return errors.New(fmt.Sprintf("missing required key for repository '%s': suffixes", handle))
+			return fmt.Errorf("missing required key for repository '%s': suffixes", handle)
 		}
 		if repoConfig.Upstreams == nil {
-			return errors.New(fmt.Sprintf("missing required key for repository '%s': upstreams", handle))
+			return fmt.Errorf("missing required key for repository '%s': upstreams", handle)
 		}
 	}
 	return nil

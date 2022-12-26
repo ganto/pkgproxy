@@ -22,5 +22,8 @@ repositories:
     suffixes:
       - .drpm
       - .rpm
+    # Get mirror list via:
+    # `curl "https://mirrors.fedoraproject.org/metalink?repo=fedora-36&arch=x86_64"`
     upstreams:
-      - http://download.fedoraproject.org/pub/fedora/linux
+      - https://mirror.init7.net/fedora/fedora/linux
+      - https://download.fedoraproject.org/pub/fedora/linux
