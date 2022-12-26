@@ -5,7 +5,7 @@ package pkgproxy
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 
@@ -26,7 +26,7 @@ func LoadConfig(config *Config, path string) error {
 	if err != nil {
 		return err
 	}
-	file, err := ioutil.ReadFile(fullPath)
+	file, err := os.ReadFile(fullPath)
 	if err != nil {
 		return err
 	}
