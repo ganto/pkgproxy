@@ -1,0 +1,26 @@
+---
+repositories:
+  alma:
+    suffixes:
+      - .drpm
+      - .rpm
+    upstreams:
+      - https://repo.almalinux.org
+  epel:
+    suffixes:
+      - .drpm
+      - .rpm
+    upstreams:
+      - http://dl.fedoraproject.org/pub/epel
+  centos:
+    suffixes:
+      - .drpm
+      - .rpm
+    upstreams:
+      - http://mirror.centos.org/centos
+  fedora:
+    suffixes:
+      - .drpm
+      - .rpm
+    upstreams:
+      - http://download.fedoraproject.org/pub/fedora/linux
