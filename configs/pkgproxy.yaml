@@ -1,0 +1,67 @@
+---
+repositories:
+  almalinux:
+    suffixes:
+      - .drpm
+      - .rpm
+    upstreams:
+      - https://mirror.init7.net/almalinux/
+      - https://repo.almalinux.org/almalinux/
+  archlinux:
+    suffixes:
+      - .tar.zst
+      - .tar.zst.sig
+    upstreams:
+      - https://mirror.puzzle.ch/archlinux/
+      - http://mirrors.kernel.org/archlinux/
+  debian:
+    suffixes:
+      - .deb
+    upstreams:
+      - https://mirror.init7.net/debian/
+      - https://debian.ethz.ch/debian/
+      - http://ftp.ch.debian.org/debian/
+  debian-security:
+    suffixes:
+      - .deb
+    upstreams:
+      - https://mirror.init7.net/debian-security/
+      - https://debian.ethz.ch/debian-security/
+      - https://security.debian.org/debian-security/
+  epel:
+    suffixes:
+      - .drpm
+      - .rpm
+    upstreams:
+      - https://mirror.init7.net/fedora/epel/
+      - https://dl.fedoraproject.org/pub/epel/
+  centos:
+    suffixes:
+      - .drpm
+      - .rpm
+    upstreams:
+      - https://mirror.init7.net/centos/
+      - http://mirror.centos.org/centos/
+  fedora:
+    suffixes:
+      - .drpm
+      - .rpm
+    # Get mirror list via:
+    # `curl "https://mirrors.fedoraproject.org/metalink?repo=fedora-36&arch=x86_64"`
+    upstreams:
+      - https://mirror.init7.net/fedora/fedora/linux/
+      - https://download.fedoraproject.org/pub/fedora/linux/
+  rockylinux:
+    suffixes:
+      - .drpm
+      - .rpm
+    upstreams:
+      - https://mirror.init7.net/rockylinux/
+      - https://mirror.puzzle.ch/rockylinux/
+      - https://dl.rockylinux.org/pub/rocky/
+  ubuntu:
+    suffixes:
+      - .deb
+    upstreams:
+      - https://mirror.init7.net/ubuntu/
+      - http://archive.ubuntu.com/ubuntu/
