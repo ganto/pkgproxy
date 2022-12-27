@@ -3,11 +3,14 @@
 package utils
 
 import (
+	"sort"
 	"strings"
+
+	"golang.org/x/exp/constraints"
 )
 
 // Return a list of the keys of a map
-func KeysFromMap[T comparable, S any](a map[T]S) []T {
+func KeysFromMap[T constraints.Ordered, S any](a map[T]S) []T {
 	keys := make([]T, len(a))
 
 	i := 0
@@ -16,6 +19,9 @@ func KeysFromMap[T comparable, S any](a map[T]S) []T {
 		i++
 	}
 
+	sort.SliceStable(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
 	return keys
 }
 
