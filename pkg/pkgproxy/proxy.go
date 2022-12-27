@@ -1,5 +1,5 @@
-// Copyright (c) 2021 LabStack
-// SPDX-License-Identifier: MIT
+// Copyright 2022 Reto Gantenbein
+// SPDX-License-Identifier: Apache-2.0
 package pkgproxy
 
 import (
@@ -7,52 +7,43 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httputil"
-	"regexp"
+	"net/url"
 	"strings"
 
+	"github.com/ganto/pkgproxy/pkg/cache"
 	echo "github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
 
-// ProxyWithConfig returns a Proxy middleware with config.
-// See: `Proxy()`
-func ProxyWithConfig(config middleware.ProxyConfig) echo.MiddlewareFunc {
-	// Defaults
-	if config.Skipper == nil {
-		config.Skipper = middleware.DefaultProxyConfig.Skipper
-	}
-	if config.Balancer == nil {
-		panic("echo: proxy middleware requires balancer")
-	}
+// RepoConfig defines the configuration of a package repository
+type RepoConfig struct {
+	Cache   cache.Cache
+	Mirrors []*url.URL
+	UrlPath string
+}
 
-	if config.Rewrite != nil {
-		if config.RegexRewrite == nil {
-			config.RegexRewrite = make(map[*regexp.Regexp]string)
-		}
-		for k, v := range rewriteRulesRegex(config.Rewrite) {
-			config.RegexRewrite[k] = v
-		}
+func RepositoryWithConfig(config RepoConfig) echo.MiddlewareFunc {
+	transport := PkgProxyTransport{
+		Rt:    http.DefaultTransport,
+		Cache: config.Cache,
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) (err error) {
-			if config.Skipper(c) {
-				return next(c)
-			}
-
 			req := c.Request()
 			res := c.Response()
-			tgt := config.Balancer.Next(c)
-			c.Set(config.ContextKey, tgt)
-			req.Host = tgt.URL.Host
-			fmt.Printf("tgt = +%s\n", tgt)
 
-			if err := rewriteURL(config.RegexRewrite, req); err != nil {
-				return err
+			tgt := config.Mirrors[0]
+			req.Host = tgt.Host
+
+			// trim repository handle
+			if len(config.UrlPath) > 0 {
+				req.RequestURI = strings.TrimPrefix(req.RequestURI, "/"+config.UrlPath)
+				req.URL.Path = strings.TrimPrefix(req.URL.Path, "/"+config.UrlPath)
 			}
 
 			// Proxy
-			proxyHTTP(tgt, c, config).ServeHTTP(res, req)
+			proxyHTTP(tgt, c, &transport).ServeHTTP(res, req)
 			if e, ok := c.Get("_error").(error); ok {
 				err = e
 			}
@@ -62,13 +53,9 @@ func ProxyWithConfig(config middleware.ProxyConfig) echo.MiddlewareFunc {
 	}
 }
 
-func proxyHTTP(tgt *middleware.ProxyTarget, c echo.Context, config middleware.ProxyConfig) http.Handler {
-	proxy := httputil.NewSingleHostReverseProxy(tgt.URL)
+func proxyHTTP(tgt *url.URL, c echo.Context, transport *PkgProxyTransport) http.Handler {
+	proxy := httputil.NewSingleHostReverseProxy(tgt)
 	proxy.ErrorHandler = func(resp http.ResponseWriter, req *http.Request, err error) {
-		desc := tgt.URL.String()
-		if tgt.Name != "" {
-			desc = fmt.Sprintf("%s(%s)", tgt.Name, tgt.URL.String())
-		}
 		// If the client canceled the request (usually by closing the connection), we can report a
 		// client error (4xx) instead of a server error (5xx) to correctly identify the situation.
 		// The Go standard library (at of late 2020) wraps the exported, standard
@@ -79,12 +66,11 @@ func proxyHTTP(tgt *middleware.ProxyTarget, c echo.Context, config middleware.Pr
 			httpError.Internal = err
 			c.Set("_error", httpError)
 		} else {
-			httpError := echo.NewHTTPError(http.StatusBadGateway, fmt.Sprintf("remote %s unreachable, could not forward: %v", desc, err))
+			httpError := echo.NewHTTPError(http.StatusBadGateway, fmt.Sprintf("upstream %s unreachable, could not forward: %v", tgt.Host, err))
 			httpError.Internal = err
 			c.Set("_error", httpError)
 		}
 	}
-	proxy.Transport = config.Transport
-	proxy.ModifyResponse = config.ModifyResponse
+	proxy.Transport = transport
 	return proxy
 }

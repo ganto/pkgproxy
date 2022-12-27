@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"fmt"
-	"net/http"
 	"net/url"
 	"path"
 	"strings"
@@ -55,11 +54,11 @@ func startServer(_ *cobra.Command, _ []string) error {
 		// try serving file from local cache directory
 		group.Use(middleware.Static(path.Join(cacheDir, handle)))
 
-		pkgCacheCfg := cache.PkgCacheConfig{
+		cacheCfg := cache.PkgCacheConfig{
 			FileSuffixes: repoConfig.Suffixes,
 			BasePath:     cacheDir,
 		}
-		pkgCache := cache.NewPkgCache(handle, &pkgCacheCfg)
+		cache := cache.NewPkgCache(handle, &cacheCfg)
 
 		fmt.Printf("Setting up handle '/%s' → %s\n", handle, strings.Join(repoConfig.Upstreams, ", "))
 		var targetUrls []*url.URL
@@ -69,24 +68,13 @@ func startServer(_ *cobra.Command, _ []string) error {
 				app.Logger.Fatal(err)
 			}
 			targetUrls = append(targetUrls, url)
-
 		}
-		upstream := middleware.NewRoundRobinBalancer([]*middleware.ProxyTarget{})
-		for _, url := range targetUrls {
-			upstream.AddTarget(&middleware.ProxyTarget{
-				URL: url,
-			})
+		repoConfig := pkgproxy.RepoConfig{
+			Cache:   cache,
+			Mirrors: targetUrls,
+			UrlPath: handle,
 		}
-		proxyCfg := middleware.ProxyConfig{
-			Balancer: upstream,
-			Rewrite:  map[string]string{"/" + handle + "/*": "/$1"},
-			Transport: pkgproxy.PkgProxyTransport{
-				Rt:    http.DefaultTransport,
-				Cache: pkgCache,
-			},
-		}
-		// forward request to upstream servers
-		group.Use(pkgproxy.ProxyWithConfig(proxyCfg))
+		group.Use(pkgproxy.RepositoryWithConfig(repoConfig))
 	}
 	app.Logger.Fatal(app.Start(fmt.Sprintf("%s:%d", listenAddress, listenPort)))
 
