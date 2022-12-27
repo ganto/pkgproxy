@@ -18,7 +18,7 @@ Run the application via a container engine (e.g. [Podman](https://podman.io/)):
 
 - Using the default repository configuration:
 ```shell
-podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z ghcr.io/ganto/pkgproxy serve --host 0.0.0.0 --config \$KO_DATA_PATH/pkgproxy.yaml
+podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z ghcr.io/ganto/pkgproxy serve --host 0.0.0.0 --config /var/run/ko/pkgproxy.yaml
 ```
 - Mounting your own local `pkgproxy.yaml`:
 ```shell
