@@ -14,6 +14,22 @@ repositories:
     upstreams:
       - https://mirror.puzzle.ch/archlinux/
       - http://mirrors.kernel.org/archlinux/
+  centos:
+    suffixes:
+      - .drpm
+      - .rpm
+    upstreams:
+      - https://mirror.init7.net/centos/
+      - http://mirror.centos.org/centos/
+  centos-stream:
+    suffixes:
+      - .drpm
+      - .rpm
+    # Get mirror list via:
+    # curl "https://mirrors.centos.org/metalink?repo=centos-baseos-9-stream&arch=x86_64&protocol=https,http"
+    upstreams:
+      - https://linuxsoft.cern.ch/centos-stream/
+      - https://mirror.stream.centos.org/
   debian:
     suffixes:
       - .deb
@@ -35,13 +51,6 @@ repositories:
     upstreams:
       - https://mirror.init7.net/fedora/epel/
       - https://dl.fedoraproject.org/pub/epel/
-  centos:
-    suffixes:
-      - .drpm
-      - .rpm
-    upstreams:
-      - https://mirror.init7.net/centos/
-      - http://mirror.centos.org/centos/
   fedora:
     suffixes:
       - .drpm

@@ -28,7 +28,7 @@ func NewRootCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "pkgproxy",
 		Args:  cobra.MinimumNArgs(1),
-		Short: "pkgproxy is a caching reverse proxy for Linux package repositories ",
+		Short: "pkgproxy is a caching forward proxy for Linux package repositories ",
 		Long: `pkgproxy is a Web server that serves Linux packages for various
 repository types (RPM, DEB, ...) from a local cache. It can be used
 as a central package server in a local network. Packages not available
