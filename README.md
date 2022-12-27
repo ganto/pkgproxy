@@ -1,4 +1,4 @@
-# pkgproxy - A caching reverse proxy for Linux package repositories
+# pkgproxy - A caching forward proxy for Linux package repositories
 
 `pkgproxy` is a Web server that serves Linux packages for various repository
 types (RPM, DEB, ...) from a local cache. It can be used as a central package

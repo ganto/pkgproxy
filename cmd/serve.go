@@ -30,7 +30,7 @@ func newServeCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:              "serve",
 		Args:             cobra.ArbitraryArgs,
-		Short:            "Start reverse proxy",
+		Short:            "Start forward proxy",
 		RunE:             startServer,
 		TraverseChildren: true,
 	}
