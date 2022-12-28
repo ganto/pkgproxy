@@ -11,46 +11,125 @@ import (
 	"strings"
 
 	"github.com/ganto/pkgproxy/pkg/cache"
+	"github.com/ganto/pkgproxy/pkg/utils"
 	echo "github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
 
-// RepoConfig defines the configuration of a package repository
-type RepoConfig struct {
-	Cache   cache.Cache
-	Mirrors []*url.URL
-	UrlPath string
-}
-
-func RepositoryWithConfig(config RepoConfig) echo.MiddlewareFunc {
-	transport := PkgProxyTransport{
-		Rt:    http.DefaultTransport,
-		Cache: config.Cache,
+type (
+	PkgProxy interface {
+		Cache(echo.HandlerFunc) echo.HandlerFunc
+		Upstream(echo.HandlerFunc) echo.HandlerFunc
 	}
 
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) (err error) {
-			req := c.Request()
-			res := c.Response()
+	PkgProxyConfig struct {
+		CacheBasePath    string
+		RepositoryConfig *RepoConfig
+	}
 
-			tgt := config.Mirrors[0]
-			req.Host = tgt.Host
+	pkgProxy struct {
+		Upstreams map[string]Upstream
+	}
+	Upstream struct {
+		Cache   cache.Cache
+		Mirrors []*url.URL
+	}
+)
 
-			// trim repository handle
-			if len(config.UrlPath) > 0 {
-				req.RequestURI = strings.TrimPrefix(req.RequestURI, "/"+config.UrlPath)
-				req.URL.Path = strings.TrimPrefix(req.URL.Path, "/"+config.UrlPath)
+func New(config *PkgProxyConfig) PkgProxy {
+	upstreams := map[string]Upstream{}
+	for _, repo := range utils.KeysFromMap(config.RepositoryConfig.Repositories) {
+		var mirrors []*url.URL
+		for _, mirror := range config.RepositoryConfig.Repositories[repo].Mirrors {
+			url, err := url.Parse(mirror)
+			if err == nil {
+				mirrors = append(mirrors, url)
 			}
-
-			// Proxy
-			proxyHTTP(tgt, c, &transport).ServeHTTP(res, req)
-			if e, ok := c.Get("_error").(error); ok {
-				err = e
-			}
-
-			return
+		}
+		cacheCfg := cache.PkgCacheConfig{
+			BasePath:     config.CacheBasePath,
+			FileSuffixes: config.RepositoryConfig.Repositories[repo].CacheSuffixes,
+		}
+		upstreams[repo] = Upstream{
+			Cache:   cache.NewPkgCache(repo, &cacheCfg),
+			Mirrors: mirrors,
 		}
 	}
+	return &pkgProxy{
+		Upstreams: upstreams,
+	}
+}
+
+func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		uri := c.Request().RequestURI
+		if pp.isRepositoryRequest(uri) {
+			cache := pp.Upstreams[getRepofromUri(uri)].Cache
+			if cache.IsCacheCandidate(uri) {
+				if cache.IsCached(uri) {
+					if err := c.File(cache.GetFilePath(uri)); err != nil {
+						return err
+					}
+					return nil
+				}
+			}
+		}
+
+		fmt.Println("Cache(): exec next() middleware")
+		if err := next(c); err != nil {
+			c.Error(err)
+		}
+		return nil
+	}
+}
+
+func (pp *pkgProxy) Upstream(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		uri := c.Request().RequestURI
+		if !pp.isRepositoryRequest(uri) {
+			fmt.Println("Upstream(): exec next() middleware")
+			if err := next(c); err != nil {
+				c.Error(err)
+				return nil
+			}
+		}
+
+		req := c.Request()
+		res := c.Response()
+
+		repo := getRepofromUri(uri)
+		tgt := pp.Upstreams[repo].Mirrors[0]
+		req.Host = tgt.Host
+
+		// trim repository handle
+		req.RequestURI = strings.TrimPrefix(req.RequestURI, "/"+repo)
+		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/"+repo)
+
+		transport := PkgProxyTransport{
+			Rt:    http.DefaultTransport,
+			Cache: pp.Upstreams[repo].Cache,
+		}
+
+		// Proxy
+		var err error
+		proxyHTTP(tgt, c, &transport).ServeHTTP(res, req)
+		if e, ok := c.Get("_error").(error); ok {
+			err = e
+		}
+
+		return err
+	}
+}
+
+// Check if the request should be handled by PkgProxy
+func (pp *pkgProxy) isRepositoryRequest(uri string) bool {
+	repo := getRepofromUri(uri)
+	return utils.Contains(utils.KeysFromMap(pp.Upstreams), repo)
+}
+
+// Return the repository name of the URL without leading "/"
+func getRepofromUri(uri string) string {
+	return strings.TrimPrefix(utils.RouteFromUri(uri), "/")
 }
 
 func proxyHTTP(tgt *url.URL, c echo.Context, transport *PkgProxyTransport) http.Handler {

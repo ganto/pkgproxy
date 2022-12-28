@@ -9,6 +9,20 @@ import (
 	"github.com/bmizerany/assert"
 )
 
+func TestContains(t *testing.T) {
+	r := Contains([]int{1, 2, 3}, 1)
+	assert.Equal(t, r, true)
+
+	r = Contains([]int{1, 2, 3}, 0)
+	assert.Equal(t, r, false)
+
+	r = Contains([]string{"a", "b", "c"}, "a")
+	assert.Equal(t, r, true)
+
+	r = Contains([]string{}, "")
+	assert.Equal(t, r, false)
+}
+
 func TestKeysFromMap(t *testing.T) {
 	k := KeysFromMap(map[string]string{})
 	assert.Equal(t, len(k), 0)
@@ -74,6 +88,11 @@ func TestFilepathFromUri(t *testing.T) {
 	f := FilepathFromUri(u.Path)
 	assert.Equal(t, f, "/foobaz")
 
+	s = "http://foo.bar/foobaz/foobar/baz?foo#bar"
+	u, _ = url.Parse(s)
+	f = FilepathFromUri(u.Path)
+	assert.Equal(t, f, "/foobaz/foobar")
+
 	s = "http://foob.ar/foo.bar"
 	u, _ = url.Parse(s)
 	f = FilepathFromUri(u.Path)
@@ -90,5 +109,30 @@ func TestFilepathFromUri(t *testing.T) {
 	assert.Equal(t, f, "/")
 
 	f = FilepathFromUri("")
+	assert.Equal(t, f, "/")
+}
+
+func TestRouteFromUri(t *testing.T) {
+	s := "http://foo.bar/foobaz/foobar?foo#bar"
+	u, _ := url.Parse(s)
+	f := RouteFromUri(u.Path)
+	assert.Equal(t, f, "/foobaz")
+
+	s = "http://foo.bar/foobaz/foobar/baz?foo#bar"
+	u, _ = url.Parse(s)
+	f = RouteFromUri(u.Path)
+	assert.Equal(t, f, "/foobaz")
+
+	s = "http://foob.ar/foo.bar"
+	u, _ = url.Parse(s)
+	f = RouteFromUri(u.Path)
+	assert.Equal(t, f, "/foo.bar")
+
+	s = "http://foo.bar/"
+	u, _ = url.Parse(s)
+	f = RouteFromUri(u.Path)
+	assert.Equal(t, f, "/")
+
+	f = RouteFromUri("")
 	assert.Equal(t, f, "/")
 }

@@ -16,6 +16,7 @@ import (
 )
 
 type Cache interface {
+	GetFilePath(string) string
 	IsCacheCandidate(string) bool
 	IsCached(string) bool
 	SaveToDisk(string, *http.Response) error
@@ -57,12 +58,16 @@ func (pc *pkgCache) IsCacheCandidate(uri string) bool {
 func (pc *pkgCache) IsCached(uri string) bool {
 	c := false
 
-	cachePath := path.Join(pc.config.BasePath, uri)
-	if _, err := os.Stat(cachePath); err == nil {
+	if _, err := os.Stat(pc.GetFilePath(uri)); err == nil {
 		c = true
 	}
 
 	return c
+}
+
+// Returns the path to the cached file
+func (pc *pkgCache) GetFilePath(uri string) string {
+	return path.Join(pc.config.BasePath, uri)
 }
 
 // Saves response body to cache

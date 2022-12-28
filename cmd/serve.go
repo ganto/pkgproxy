@@ -4,11 +4,7 @@ package cmd
 
 import (
 	"fmt"
-	"net/url"
-	"path"
-	"strings"
 
-	"github.com/ganto/pkgproxy/pkg/cache"
 	"github.com/ganto/pkgproxy/pkg/pkgproxy"
 	echo "github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -48,34 +44,13 @@ func startServer(_ *cobra.Command, _ []string) error {
 		app.Logger.SetLevel(log.DEBUG)
 	}
 
-	for handle, repoConfig := range pkgProxyConfig.Repositories {
-		group := app.Group("/" + handle)
+	pkgProxy := pkgproxy.New(&pkgproxy.PkgProxyConfig{
+		CacheBasePath:    cacheDir,
+		RepositoryConfig: &repoConfig,
+	})
+	app.Use(pkgProxy.Cache)
+	app.Use(pkgProxy.Upstream)
 
-		// try serving file from local cache directory
-		group.Use(middleware.Static(path.Join(cacheDir, handle)))
-
-		cacheCfg := cache.PkgCacheConfig{
-			FileSuffixes: repoConfig.Suffixes,
-			BasePath:     cacheDir,
-		}
-		cache := cache.NewPkgCache(handle, &cacheCfg)
-
-		fmt.Printf("Setting up handle '/%s' → %s\n", handle, strings.Join(repoConfig.Upstreams, ", "))
-		var targetUrls []*url.URL
-		for _, upstreamUrl := range repoConfig.Upstreams {
-			url, err := url.Parse(upstreamUrl)
-			if err != nil {
-				app.Logger.Fatal(err)
-			}
-			targetUrls = append(targetUrls, url)
-		}
-		repoConfig := pkgproxy.RepoConfig{
-			Cache:   cache,
-			Mirrors: targetUrls,
-			UrlPath: handle,
-		}
-		group.Use(pkgproxy.RepositoryWithConfig(repoConfig))
-	}
 	app.Logger.Fatal(app.Start(fmt.Sprintf("%s:%d", listenAddress, listenPort)))
 
 	return nil

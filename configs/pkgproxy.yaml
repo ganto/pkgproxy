@@ -4,21 +4,21 @@ repositories:
     suffixes:
       - .drpm
       - .rpm
-    upstreams:
+    mirrors:
       - https://mirror.init7.net/almalinux/
       - https://repo.almalinux.org/almalinux/
   archlinux:
     suffixes:
       - .tar.zst
       - .tar.zst.sig
-    upstreams:
+    mirrors:
       - https://mirror.puzzle.ch/archlinux/
       - http://mirrors.kernel.org/archlinux/
   centos:
     suffixes:
       - .drpm
       - .rpm
-    upstreams:
+    mirrors:
       - https://mirror.init7.net/centos/
       - http://mirror.centos.org/centos/
   centos-stream:
@@ -27,20 +27,20 @@ repositories:
       - .rpm
     # Get mirror list via:
     # curl "https://mirrors.centos.org/metalink?repo=centos-baseos-9-stream&arch=x86_64&protocol=https,http"
-    upstreams:
+    mirrors:
       - https://linuxsoft.cern.ch/centos-stream/
       - https://mirror.stream.centos.org/
   debian:
     suffixes:
       - .deb
-    upstreams:
+    mirrors:
       - https://mirror.init7.net/debian/
       - https://debian.ethz.ch/debian/
       - http://ftp.ch.debian.org/debian/
   debian-security:
     suffixes:
       - .deb
-    upstreams:
+    mirrors:
       - https://mirror.init7.net/debian-security/
       - https://debian.ethz.ch/debian-security/
       - https://security.debian.org/debian-security/
@@ -48,7 +48,7 @@ repositories:
     suffixes:
       - .drpm
       - .rpm
-    upstreams:
+    mirrors:
       - https://mirror.init7.net/fedora/epel/
       - https://dl.fedoraproject.org/pub/epel/
   fedora:
@@ -57,20 +57,20 @@ repositories:
       - .rpm
     # Get mirror list via:
     # `curl "https://mirrors.fedoraproject.org/metalink?repo=fedora-36&arch=x86_64"`
-    upstreams:
+    mirrors:
       - https://mirror.init7.net/fedora/fedora/linux/
       - https://download.fedoraproject.org/pub/fedora/linux/
   rockylinux:
     suffixes:
       - .drpm
       - .rpm
-    upstreams:
+    mirrors:
       - https://mirror.init7.net/rockylinux/
       - https://mirror.puzzle.ch/rockylinux/
       - https://dl.rockylinux.org/pub/rocky/
   ubuntu:
     suffixes:
       - .deb
-    upstreams:
+    mirrors:
       - https://mirror.init7.net/ubuntu/
       - http://archive.ubuntu.com/ubuntu/
