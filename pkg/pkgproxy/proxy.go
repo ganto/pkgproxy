@@ -3,8 +3,10 @@
 package pkgproxy
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -46,12 +48,11 @@ func New(config *PkgProxyConfig) PkgProxy {
 				mirrors = append(mirrors, url)
 			}
 		}
-		cacheCfg := cache.PkgCacheConfig{
-			BasePath:     config.CacheBasePath,
-			FileSuffixes: config.RepositoryConfig.Repositories[repo].CacheSuffixes,
-		}
 		upstreams[repo] = Upstream{
-			Cache:   cache.NewPkgCache(repo, &cacheCfg),
+			Cache: cache.New(&cache.CacheConfig{
+				BasePath:     config.CacheBasePath,
+				FileSuffixes: config.RepositoryConfig.Repositories[repo].CacheSuffixes,
+			}),
 			Mirrors: mirrors,
 		}
 	}
@@ -60,21 +61,54 @@ func New(config *PkgProxyConfig) PkgProxy {
 	}
 }
 
+// This middleware function checks if a request can be served from the
+// local cache and does so if possible. Otherwise it will make sure the
+// response is cached if necessary.
 func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		uri := c.Request().RequestURI
+		var repoCache cache.Cache
+		var rspBody *bytes.Buffer
+
+		// the request URI might be changed later, keep the original value
+		uri := strings.Clone(c.Request().RequestURI)
 
 		if pp.isRepositoryRequest(uri) {
-			cache := pp.Upstreams[getRepofromUri(uri)].Cache
-			if cache.IsCacheCandidate(uri) {
-				if cache.IsCached(uri) {
-					return c.File(cache.GetFilePath(uri))
+			repoCache = pp.Upstreams[getRepofromUri(uri)].Cache
+
+			if repoCache.IsCacheCandidate(uri) {
+				// serve from cache if possible
+				if repoCache.IsCached(uri) {
+					return c.File(repoCache.GetFilePath(uri))
+
+				} else {
+					// if not in cache write response body to buffer
+					rspBody = new(bytes.Buffer)
+					bodyWriter := io.MultiWriter(c.Response().Writer, rspBody)
+					writer := &bufferWriter{
+						Writer:         bodyWriter,
+						ResponseWriter: c.Response().Writer}
+					c.Response().Writer = writer
 				}
 			}
 		}
 
 		fmt.Println("Cache(): exec next() middleware")
-		return next(c)
+		if err := next(c); err != nil {
+			return err
+		}
+		fmt.Println("Cache(): handle response")
+
+		if pp.isRepositoryRequest(uri) {
+			if repoCache.IsCacheCandidate(uri) && !repoCache.IsCached(uri) && len(rspBody.Bytes()) > 0 {
+				// save buffer to disk
+				if err := repoCache.SaveToDisk(uri, rspBody); err != nil {
+					// don't fail request if we cannot write to cache
+					fmt.Printf("Error: %s", err.Error())
+				}
+			}
+		}
+
+		return nil
 	}
 }
 
@@ -98,8 +132,7 @@ func (pp *pkgProxy) Upstream(next echo.HandlerFunc) echo.HandlerFunc {
 		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/"+repo)
 
 		transport := PkgProxyTransport{
-			Rt:    http.DefaultTransport,
-			Cache: pp.Upstreams[repo].Cache,
+			Rt: http.DefaultTransport,
 		}
 
 		// Proxy

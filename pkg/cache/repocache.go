@@ -6,8 +6,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path"
 	"strings"
@@ -19,32 +17,35 @@ type Cache interface {
 	GetFilePath(string) string
 	IsCacheCandidate(string) bool
 	IsCached(string) bool
-	SaveToDisk(string, *http.Response) error
+	SaveToDisk(string, *bytes.Buffer) error
 }
 
-type pkgCache struct {
-	name   string
-	config *PkgCacheConfig
+type repoCache struct {
+	config *CacheConfig
 }
 
-type PkgCacheConfig struct {
-	FileSuffixes []string
+type CacheConfig struct {
 	BasePath     string
+	FileSuffixes []string
 }
 
-func NewPkgCache(name string, cfg *PkgCacheConfig) Cache {
-	return &pkgCache{
-		name:   name,
+func New(cfg *CacheConfig) Cache {
+	return &repoCache{
 		config: cfg,
 	}
 }
 
+// Returns the path to the cached file
+func (rc *repoCache) GetFilePath(uri string) string {
+	return path.Join(rc.config.BasePath, uri)
+}
+
 // Verifies if the given file URI is candidate to be cached
-func (pc *pkgCache) IsCacheCandidate(uri string) bool {
+func (rc *repoCache) IsCacheCandidate(uri string) bool {
 	c := false
 
 	name := utils.FilenameFromUri(uri)
-	for _, suffix := range pc.config.FileSuffixes {
+	for _, suffix := range rc.config.FileSuffixes {
 		if strings.HasSuffix(name, suffix) {
 			c = true
 			break
@@ -55,39 +56,25 @@ func (pc *pkgCache) IsCacheCandidate(uri string) bool {
 }
 
 // Verifies if the file is already cached
-func (pc *pkgCache) IsCached(uri string) bool {
+func (rc *repoCache) IsCached(uri string) bool {
 	c := false
 
-	if _, err := os.Stat(pc.GetFilePath(uri)); err == nil {
+	if _, err := os.Stat(rc.GetFilePath(uri)); err == nil {
 		c = true
 	}
 
 	return c
 }
 
-// Returns the path to the cached file
-func (pc *pkgCache) GetFilePath(uri string) string {
-	return path.Join(pc.config.BasePath, uri)
-}
-
-// Saves response body to cache
-func (pc *pkgCache) SaveToDisk(uri string, rsp *http.Response) error {
-	cachePath := path.Join(pc.config.BasePath, uri)
+// Saves buffer to file
+func (rc *repoCache) SaveToDisk(uri string, buffer *bytes.Buffer) error {
+	cachePath := path.Join(rc.config.BasePath, uri)
 
 	if _, err := os.Stat(path.Dir(cachePath)); errors.Is(err, os.ErrNotExist) {
 		if err := os.MkdirAll(path.Dir(cachePath), os.ModePerm); err != nil {
 			return err
 		}
 	}
-
-	payload, err := io.ReadAll(rsp.Body)
-	if err != nil {
-		return err
-	}
-	if err := rsp.Body.Close(); err != nil {
-		return err
-	}
-	rsp.Body = io.NopCloser(bytes.NewReader(payload))
 
 	fmt.Printf("writing file '%s': ", cachePath)
 	cacheFile, err := os.Create(cachePath)
@@ -96,7 +83,7 @@ func (pc *pkgCache) SaveToDisk(uri string, rsp *http.Response) error {
 	}
 	defer cacheFile.Close()
 
-	size, err := cacheFile.ReadFrom(bytes.NewReader(payload))
+	size, err := cacheFile.ReadFrom(buffer)
 	if err != nil {
 		return err
 	}
