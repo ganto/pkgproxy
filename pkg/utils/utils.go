@@ -9,6 +9,16 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
+// Check if slice contains element
+func Contains[T comparable](s []T, e T) bool {
+	for _, i := range s {
+		if i == e {
+			return true
+		}
+	}
+	return false
+}
+
 // Return a list of the keys of a map
 func KeysFromMap[T constraints.Ordered, S any](a map[T]S) []T {
 	keys := make([]T, len(a))
@@ -92,4 +102,16 @@ func FilepathFromUri(uri string) string {
 	}
 
 	return path
+}
+
+// RouteFromUri returns the element before the second "/".
+func RouteFromUri(uri string) string {
+	route := "/"
+
+	path := strings.Split(uri, "/")
+	if len(path) > 1 {
+		route = "/" + path[1]
+	}
+
+	return route
 }

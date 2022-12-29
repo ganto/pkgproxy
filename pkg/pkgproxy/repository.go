@@ -12,16 +12,17 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
-type Config struct {
+// RepoConfig defines the upstream package repositories
+type RepoConfig struct {
 	Repositories map[string]Repository `yaml:"repositories"`
 }
 
 type Repository struct {
-	Suffixes  []string `yaml:"suffixes"`
-	Upstreams []string `yaml:"upstreams"`
+	CacheSuffixes []string `yaml:"suffixes"`
+	Mirrors       []string `yaml:"mirrors"`
 }
 
-func LoadConfig(config *Config, path string) error {
+func LoadConfig(config *RepoConfig, path string) error {
 	fullPath, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -43,7 +44,7 @@ func LoadConfig(config *Config, path string) error {
 	return nil
 }
 
-func validateConfig(config *Config) error {
+func validateConfig(config *RepoConfig) error {
 	if config.Repositories == nil {
 		return errors.New("missing required key 'repositories'")
 	}
@@ -51,11 +52,11 @@ func validateConfig(config *Config) error {
 		if alphanum := regexp.MustCompile("^[a-zA-Z0-9_~.-]*$").MatchString(handle); !alphanum {
 			return fmt.Errorf("invalid repository name '%s'. Must be alphanumeric or in '-', '_', '.', '~'", handle)
 		}
-		if repoConfig.Suffixes == nil {
+		if repoConfig.CacheSuffixes == nil {
 			return fmt.Errorf("missing required key for repository '%s': suffixes", handle)
 		}
-		if repoConfig.Upstreams == nil {
-			return fmt.Errorf("missing required key for repository '%s': upstreams", handle)
+		if repoConfig.Mirrors == nil {
+			return fmt.Errorf("missing required key for repository '%s': mirrors", handle)
 		}
 	}
 	return nil

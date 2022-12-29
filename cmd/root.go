@@ -11,10 +11,10 @@ import (
 )
 
 var (
-	cacheDir       string
-	configPath     string
-	enableDebug    bool
-	pkgProxyConfig pkgproxy.Config
+	cacheDir    string
+	configPath  string
+	enableDebug bool
+	repoConfig  pkgproxy.RepoConfig
 )
 
 const (
@@ -38,7 +38,7 @@ upstream mirrors.
 Complete documentation is available at https://github.com/ganto/pkgproxy`,
 	}
 	c.PersistentFlags().StringVar(&cacheDir, "cachedir", defaultDir, "path to the local cache directory")
-	c.PersistentFlags().StringVarP(&configPath, "config", "c", defaultConfigPath, "path to config file")
+	c.PersistentFlags().StringVarP(&configPath, "config", "c", defaultConfigPath, "path to the repository config file")
 	c.PersistentFlags().BoolVar(&enableDebug, "debug", false, "enable debugging")
 	c.AddCommand(newServeCommand())
 
@@ -57,7 +57,7 @@ func initConfig() {
 		}
 	}
 
-	if err := pkgproxy.LoadConfig(&pkgProxyConfig, configPath); err != nil {
+	if err := pkgproxy.LoadConfig(&repoConfig, configPath); err != nil {
 		fmt.Printf("unable to load configuration '%s': %s\n", configPath, err.Error())
 		os.Exit(1)
 	}

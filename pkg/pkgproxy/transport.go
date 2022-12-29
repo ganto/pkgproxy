@@ -3,25 +3,20 @@
 package pkgproxy
 
 import (
-	"fmt"
 	"net/http"
-	"strings"
 
-	"github.com/ganto/pkgproxy/pkg/cache"
 	"github.com/ganto/pkgproxy/pkg/utils"
 )
 
-type PkgProxyTransport struct {
-	Rt    http.RoundTripper
-	Cache cache.Cache
+type transport struct {
+	RT http.RoundTripper
 }
 
-func (ppt PkgProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// save original request details for potential redirect and later caching
-	reqUri := strings.Clone(req.RequestURI)
+// Custom RountTrip that follows redirects
+func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	reqHeaders := req.Header
 
-	rsp, err := ppt.Rt.RoundTrip(req)
+	rsp, err := t.RT.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
@@ -30,14 +25,6 @@ func (ppt PkgProxyTransport) RoundTrip(req *http.Request) (*http.Response, error
 	if rsp.StatusCode == 301 || rsp.StatusCode == 302 {
 		if err := followRedirect(rsp, reqHeaders); err != nil {
 			return nil, err
-		}
-	}
-
-	// save payload in cache directory
-	if ppt.Cache.IsCacheCandidate(reqUri) && !ppt.Cache.IsCached(reqUri) {
-		if err = ppt.Cache.SaveToDisk(reqUri, rsp); err != nil {
-			// don't fail request if we cannot write to cache
-			fmt.Printf("Error: %s", err.Error())
 		}
 	}
 
