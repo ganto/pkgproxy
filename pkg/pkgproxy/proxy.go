@@ -63,23 +63,18 @@ func New(config *PkgProxyConfig) PkgProxy {
 func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		uri := c.Request().RequestURI
+
 		if pp.isRepositoryRequest(uri) {
 			cache := pp.Upstreams[getRepofromUri(uri)].Cache
 			if cache.IsCacheCandidate(uri) {
 				if cache.IsCached(uri) {
-					if err := c.File(cache.GetFilePath(uri)); err != nil {
-						return err
-					}
-					return nil
+					return c.File(cache.GetFilePath(uri))
 				}
 			}
 		}
 
 		fmt.Println("Cache(): exec next() middleware")
-		if err := next(c); err != nil {
-			c.Error(err)
-		}
-		return nil
+		return next(c)
 	}
 }
 
@@ -88,10 +83,7 @@ func (pp *pkgProxy) Upstream(next echo.HandlerFunc) echo.HandlerFunc {
 		uri := c.Request().RequestURI
 		if !pp.isRepositoryRequest(uri) {
 			fmt.Println("Upstream(): exec next() middleware")
-			if err := next(c); err != nil {
-				c.Error(err)
-				return nil
-			}
+			return next(c)
 		}
 
 		req := c.Request()
