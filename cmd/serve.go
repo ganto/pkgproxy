@@ -50,6 +50,7 @@ func startServer(_ *cobra.Command, _ []string) error {
 	})
 	app.Use(pkgProxy.Cache)
 	app.Use(pkgProxy.Upstream)
+	app.Use(pkgProxy.Proxy)
 
 	app.Logger.Fatal(app.Start(fmt.Sprintf("%s:%d", listenAddress, listenPort)))
 

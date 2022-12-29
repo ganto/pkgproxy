@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"path"
 	"strings"
 
 	"github.com/ganto/pkgproxy/pkg/cache"
@@ -22,6 +23,7 @@ type (
 	PkgProxy interface {
 		Cache(echo.HandlerFunc) echo.HandlerFunc
 		Upstream(echo.HandlerFunc) echo.HandlerFunc
+		Proxy(echo.HandlerFunc) echo.HandlerFunc
 	}
 
 	PkgProxyConfig struct {
@@ -112,32 +114,45 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+// Adjust request to use upstream mirror depending on repository configuration
 func (pp *pkgProxy) Upstream(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		uri := c.Request().RequestURI
-		if !pp.isRepositoryRequest(uri) {
+		req := c.Request()
+
+		if !pp.isRepositoryRequest(req.RequestURI) {
 			fmt.Println("Upstream(): exec next() middleware")
 			return next(c)
 		}
 
+		repo := getRepofromUri(req.RequestURI)
+		req.Host = pp.Upstreams[repo].Mirrors[0].Host
+		req.URL.Scheme = pp.Upstreams[repo].Mirrors[0].Scheme
+
+		// construct new path from upstream mirror and request URI stripped by the repo prefix
+		mirrorPath := pp.Upstreams[repo].Mirrors[0].Path
+		upstreamPath := path.Join(mirrorPath, strings.TrimPrefix(req.RequestURI, "/"+repo))
+		req.RequestURI = upstreamPath
+		req.URL.Path = upstreamPath
+
+		return next(c)
+	}
+}
+
+// Proxy request to upstream
+func (pp *pkgProxy) Proxy(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
 		req := c.Request()
-		res := c.Response()
 
-		repo := getRepofromUri(uri)
-		tgt := pp.Upstreams[repo].Mirrors[0]
-		req.Host = tgt.Host
-
-		// trim repository handle
-		req.RequestURI = strings.TrimPrefix(req.RequestURI, "/"+repo)
-		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/"+repo)
-
-		transport := PkgProxyTransport{
-			Rt: http.DefaultTransport,
+		if !pp.isRepositoryRequest(req.RequestURI) {
+			fmt.Println("Upstream(): exec next() middleware")
+			return next(c)
 		}
 
-		// Proxy
+		target, _ := url.Parse(req.URL.Scheme + "://" + req.Host)
+		followRedirect := transport{RT: http.DefaultTransport}
+
 		var err error
-		proxyHTTP(tgt, c, &transport).ServeHTTP(res, req)
+		proxyHTTP(target, c, &followRedirect).ServeHTTP(c.Response(), c.Request())
 		if e, ok := c.Get("_error").(error); ok {
 			err = e
 		}
@@ -157,8 +172,8 @@ func getRepofromUri(uri string) string {
 	return strings.TrimPrefix(utils.RouteFromUri(uri), "/")
 }
 
-func proxyHTTP(tgt *url.URL, c echo.Context, transport *PkgProxyTransport) http.Handler {
-	proxy := httputil.NewSingleHostReverseProxy(tgt)
+func proxyHTTP(target *url.URL, c echo.Context, transport *transport) http.Handler {
+	proxy := httputil.NewSingleHostReverseProxy(target)
 	proxy.ErrorHandler = func(resp http.ResponseWriter, req *http.Request, err error) {
 		// If the client canceled the request (usually by closing the connection), we can report a
 		// client error (4xx) instead of a server error (5xx) to correctly identify the situation.
@@ -170,7 +185,7 @@ func proxyHTTP(tgt *url.URL, c echo.Context, transport *PkgProxyTransport) http.
 			httpError.Internal = err
 			c.Set("_error", httpError)
 		} else {
-			httpError := echo.NewHTTPError(http.StatusBadGateway, fmt.Sprintf("upstream %s unreachable, could not forward: %v", tgt.Host, err))
+			httpError := echo.NewHTTPError(http.StatusBadGateway, fmt.Sprintf("upstream %s unreachable, could not forward: %v", target.Host, err))
 			httpError.Internal = err
 			c.Set("_error", httpError)
 		}

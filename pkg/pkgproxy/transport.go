@@ -8,14 +8,15 @@ import (
 	"github.com/ganto/pkgproxy/pkg/utils"
 )
 
-type PkgProxyTransport struct {
-	Rt http.RoundTripper
+type transport struct {
+	RT http.RoundTripper
 }
 
-func (ppt PkgProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+// Custom RountTrip that follows redirects
+func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	reqHeaders := req.Header
 
-	rsp, err := ppt.Rt.RoundTrip(req)
+	rsp, err := t.RT.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
