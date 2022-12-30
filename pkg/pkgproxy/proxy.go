@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
 	"path"
@@ -117,6 +118,7 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 // Adjust request to use upstream mirror depending on repository configuration
 func (pp *pkgProxy) Upstream(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
+		success := false
 		req := c.Request()
 
 		if !pp.isRepositoryRequest(req.RequestURI) {
@@ -125,16 +127,40 @@ func (pp *pkgProxy) Upstream(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		repo := getRepofromUri(req.RequestURI)
-		req.Host = pp.Upstreams[repo].Mirrors[0].Host
-		req.URL.Scheme = pp.Upstreams[repo].Mirrors[0].Scheme
+		index := 0
+		for !success && index < len(pp.Upstreams[repo].Mirrors) {
+			req.Host = pp.Upstreams[repo].Mirrors[index].Host
+			req.URL.Scheme = pp.Upstreams[repo].Mirrors[index].Scheme
 
-		// construct new path from upstream mirror and request URI stripped by the repo prefix
-		mirrorPath := pp.Upstreams[repo].Mirrors[0].Path
-		upstreamPath := path.Join(mirrorPath, strings.TrimPrefix(req.RequestURI, "/"+repo))
-		req.RequestURI = upstreamPath
-		req.URL.Path = upstreamPath
+			// construct new path from upstream mirror and request URI stripped by the repo prefix
+			mirrorPath := pp.Upstreams[repo].Mirrors[index].Path
+			upstreamPath := path.Join(mirrorPath, strings.TrimPrefix(req.RequestURI, "/"+repo))
+			req.RequestURI = upstreamPath
+			req.URL.Path = upstreamPath
 
-		return next(c)
+			fmt.Printf("response (pre) = %s\n", c.Response())
+			fmt.Println("Upstream(): exec next() middleware")
+			if err := next(c); err != nil {
+				return err
+			}
+			fmt.Println("Upstream(): handle response")
+
+			success = c.Response().Status == 200
+			fmt.Printf("Upstream(): retry = %d, status = %d, success = %t\n", index, c.Response().Status, success)
+			if !success {
+				index += 1
+				// reset context.Response()
+				fmt.Printf("response (orig) = %s\n", c.Response())
+				//c.SetResponse(echo.NewResponse(httptest.NewRecorder(), c.Echo()))
+				c.Response().Committed = false
+				c.Response().Writer = httptest.NewRecorder()
+				fmt.Printf("response (new) = %s\n", c.Response())
+			}
+
+		}
+
+		fmt.Printf("response (final) = %s\n", c.Response())
+		return nil
 	}
 }
 
