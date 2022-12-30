@@ -25,7 +25,7 @@ podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z --volume ./pkgprox
 
 ## Repository Configuration
 
-An example repository configuration can be found at [config/pkgproxy.yaml](config/pkgproxy.yaml).
+An example repository configuration can be found at [configs/pkgproxy.yaml](configs/pkgproxy.yaml).
 
 ## Client Configuration
 
