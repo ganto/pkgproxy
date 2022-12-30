@@ -21,8 +21,8 @@ func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
-	// follow HTTP 301/302 redirects
-	if rsp.StatusCode == 301 || rsp.StatusCode == 302 {
+	// follow HTTP redirects
+	if utils.Contains([]int{301, 302, 303, 307, 308}, rsp.StatusCode) {
 		if err := followRedirect(rsp, reqHeaders); err != nil {
 			return nil, err
 		}
