@@ -3,7 +3,9 @@
 package pkgproxy
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/ganto/pkgproxy/pkg/utils"
 )
@@ -39,8 +41,12 @@ func followRedirect(rsp *http.Response, headers http.Header) error {
 		return err
 	}
 
-	client := &http.Client{}
-	req, err := http.NewRequest(http.MethodGet, location.String(), nil)
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, location.String(), nil)
 	if err != nil {
 		return err
 	}

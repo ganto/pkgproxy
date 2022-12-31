@@ -38,6 +38,8 @@ func newServeCommand() *cobra.Command {
 
 func startServer(_ *cobra.Command, _ []string) error {
 	app := echo.New()
+	app.HideBanner = true
+
 	app.Use(middleware.Logger())
 	app.Use(middleware.Recover())
 	if enableDebug {
