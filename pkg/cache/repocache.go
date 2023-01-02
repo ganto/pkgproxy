@@ -76,7 +76,7 @@ func (rc *repoCache) SaveToDisk(uri string, buffer *bytes.Buffer) error {
 		}
 	}
 
-	fmt.Printf("writing file '%s': ", cachePath)
+	fmt.Printf("<== writing file '%s': ", cachePath)
 	cacheFile, err := os.Create(cachePath)
 	if err != nil {
 		return err
