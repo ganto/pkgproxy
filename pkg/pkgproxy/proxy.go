@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/ganto/pkgproxy/pkg/cache"
 	"github.com/ganto/pkgproxy/pkg/utils"
@@ -148,8 +149,12 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 
 		if pp.isRepositoryRequest(uri) {
 			if repoCache.IsCacheCandidate(uri) && !repoCache.IsCached(uri) && len(rspBody.Bytes()) > 0 {
+				timestamp := time.Now().Local()
+				if c.Response().Header().Get("Last-Modified") != "" {
+					timestamp, _ = http.ParseTime(c.Response().Header().Get("Last-Modified"))
+				}
 				// save buffer to disk
-				if err := repoCache.SaveToDisk(uri, rspBody); err != nil {
+				if err := repoCache.SaveToDisk(uri, rspBody, timestamp); err != nil {
 					// don't fail request if we cannot write to cache
 					fmt.Printf("Error: %s", err.Error())
 				}
