@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/ganto/pkgproxy/pkg/utils"
 )
@@ -17,7 +18,7 @@ type Cache interface {
 	GetFilePath(string) string
 	IsCacheCandidate(string) bool
 	IsCached(string) bool
-	SaveToDisk(string, *bytes.Buffer) error
+	SaveToDisk(string, *bytes.Buffer, time.Time) error
 }
 
 type repoCache struct {
@@ -67,17 +68,17 @@ func (rc *repoCache) IsCached(uri string) bool {
 }
 
 // Saves buffer to file
-func (rc *repoCache) SaveToDisk(uri string, buffer *bytes.Buffer) error {
-	cachePath := path.Join(rc.config.BasePath, uri)
+func (rc *repoCache) SaveToDisk(uri string, buffer *bytes.Buffer, fileTime time.Time) error {
+	filePath := path.Join(rc.config.BasePath, uri)
 
-	if _, err := os.Stat(path.Dir(cachePath)); errors.Is(err, os.ErrNotExist) {
-		if err := os.MkdirAll(path.Dir(cachePath), os.ModePerm); err != nil {
+	if _, err := os.Stat(path.Dir(filePath)); errors.Is(err, os.ErrNotExist) {
+		if err := os.MkdirAll(path.Dir(filePath), os.ModePerm); err != nil {
 			return err
 		}
 	}
 
-	fmt.Printf("<== writing file '%s': ", cachePath)
-	cacheFile, err := os.Create(cachePath)
+	fmt.Printf("<== writing file '%s': ", filePath)
+	cacheFile, err := os.Create(filePath)
 	if err != nil {
 		return err
 	}
@@ -88,6 +89,11 @@ func (rc *repoCache) SaveToDisk(uri string, buffer *bytes.Buffer) error {
 		return err
 	}
 	fmt.Printf("%d bytes written\n", size)
+
+	// set modified time to given timestamp
+	if err := os.Chtimes(filePath, time.Now().Local(), fileTime); err != nil {
+		return err
+	}
 
 	return nil
 }
