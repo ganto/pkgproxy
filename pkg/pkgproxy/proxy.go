@@ -4,11 +4,9 @@ package pkgproxy
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"path"
 	"strings"
@@ -16,32 +14,81 @@ import (
 	"github.com/ganto/pkgproxy/pkg/cache"
 	"github.com/ganto/pkgproxy/pkg/utils"
 	echo "github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 )
 
 type (
 	PkgProxy interface {
 		Cache(echo.HandlerFunc) echo.HandlerFunc
-		Upstream(echo.HandlerFunc) echo.HandlerFunc
-		Proxy(echo.HandlerFunc) echo.HandlerFunc
+		ForwardProxy(echo.HandlerFunc) echo.HandlerFunc
 	}
 
 	PkgProxyConfig struct {
 		CacheBasePath    string
 		RepositoryConfig *RepoConfig
+
+		// To customize the transport to remote.
+		// Examples: If custom TLS certificates are required.
+		Transport http.RoundTripper
 	}
 
 	pkgProxy struct {
-		Upstreams map[string]Upstream
+		transport http.RoundTripper
+		upstreams map[string]upstream
 	}
-	Upstream struct {
-		Cache   cache.Cache
-		Mirrors []*url.URL
+	upstream struct {
+		cache   cache.Cache
+		mirrors []*url.URL
+	}
+)
+
+var (
+	// HTTP request headers that will be forwarded to origin server
+	allowedRequestHeaders = []string{
+		"Accept",
+		"Accept-Encoding",
+		"Accept-Language",
+		"Authorization",
+		"Cache-Control",
+		"Cookie",
+		"Referer",
+		"User-Agent",
+	}
+
+	// HTTP response headers that will be forwarded to client
+	allowedResponseHeaders = []string{
+		"Accept-Ranges",
+		"Age",
+		"Allow",
+		"Content-Encoding",
+		"Content-Language",
+		"Content-Type",
+		"Cache-Control",
+		"Date",
+		"Etag",
+		"Expires",
+		"Last-Modified",
+		"Location",
+		"Server",
+		"Vary",
+	}
+
+	// Status codes which will trigger a new request to the "Location" header
+	redirectStatusCodes = []int{
+		301,
+		302,
+		303,
+		307,
+		308,
 	}
 )
 
 func New(config *PkgProxyConfig) PkgProxy {
-	upstreams := map[string]Upstream{}
+	transport := config.Transport
+	if config.Transport == nil {
+		transport = http.DefaultTransport
+	}
+
+	upstreams := map[string]upstream{}
 	for _, repo := range utils.KeysFromMap(config.RepositoryConfig.Repositories) {
 		var mirrors []*url.URL
 		for _, mirror := range config.RepositoryConfig.Repositories[repo].Mirrors {
@@ -50,16 +97,17 @@ func New(config *PkgProxyConfig) PkgProxy {
 				mirrors = append(mirrors, url)
 			}
 		}
-		upstreams[repo] = Upstream{
-			Cache: cache.New(&cache.CacheConfig{
+		upstreams[repo] = upstream{
+			cache: cache.New(&cache.CacheConfig{
 				BasePath:     config.CacheBasePath,
 				FileSuffixes: config.RepositoryConfig.Repositories[repo].CacheSuffixes,
 			}),
-			Mirrors: mirrors,
+			mirrors: mirrors,
 		}
 	}
 	return &pkgProxy{
-		Upstreams: upstreams,
+		transport: transport,
+		upstreams: upstreams,
 	}
 }
 
@@ -75,7 +123,7 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 		uri := strings.Clone(c.Request().RequestURI)
 
 		if pp.isRepositoryRequest(uri) {
-			repoCache = pp.Upstreams[getRepofromUri(uri)].Cache
+			repoCache = pp.upstreams[getRepofromUri(uri)].cache
 
 			if repoCache.IsCacheCandidate(uri) {
 				// serve from cache if possible
@@ -94,11 +142,9 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 		}
 
-		fmt.Println("Cache(): exec next() middleware")
 		if err := next(c); err != nil {
 			return err
 		}
-		fmt.Println("Cache(): handle response")
 
 		if pp.isRepositoryRequest(uri) {
 			if repoCache.IsCacheCandidate(uri) && !repoCache.IsCached(uri) && len(rspBody.Bytes()) > 0 {
@@ -114,82 +160,111 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
-// Adjust request to use upstream mirror depending on repository configuration
-func (pp *pkgProxy) Upstream(next echo.HandlerFunc) echo.HandlerFunc {
+// Proxy request to upstream
+func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		req := c.Request()
+		clientReq := c.Request()
+		clientResp := c.Response()
 
-		if !pp.isRepositoryRequest(req.RequestURI) {
-			fmt.Println("Upstream(): exec next() middleware")
+		if !pp.isRepositoryRequest(clientReq.RequestURI) {
 			return next(c)
 		}
 
-		repo := getRepofromUri(req.RequestURI)
-		req.Host = pp.Upstreams[repo].Mirrors[0].Host
-		req.URL.Scheme = pp.Upstreams[repo].Mirrors[0].Scheme
+		var rsp *http.Response
+		var err error
 
-		// construct new path from upstream mirror and request URI stripped by the repo prefix
-		mirrorPath := pp.Upstreams[repo].Mirrors[0].Path
-		upstreamPath := path.Join(mirrorPath, strings.TrimPrefix(req.RequestURI, "/"+repo))
-		req.RequestURI = upstreamPath
-		req.URL.Path = upstreamPath
+		repo := getRepofromUri(clientReq.RequestURI)
+		success := false
+		index := 0
 
-		return next(c)
+		for !success && index < len(pp.upstreams[repo].mirrors) {
+			// construct new path from upstream mirror and request URI stripped by the repo prefix
+			mirror := pp.upstreams[repo].mirrors[index]
+			mirrorPath := mirror.Path
+			upstreamPath := path.Join(mirrorPath, strings.TrimPrefix(clientReq.URL.Path, "/"+repo))
+
+			rsp, err = pp.forwardClientRequestToOrigin(clientReq, &url.URL{
+				Scheme: mirror.Scheme,
+				Host:   mirror.Host,
+				Path:   upstreamPath,
+			})
+
+			if err == nil {
+				defer rsp.Body.Close()
+				fmt.Printf("<-- %v %+v\n", rsp.Status, rsp.Header)
+
+				// follow HTTP redirects
+				if utils.Contains(redirectStatusCodes, rsp.StatusCode) {
+					var location *url.URL
+					location, err = rsp.Location()
+					if err == nil {
+						rsp, err = pp.forwardClientRequestToOrigin(clientReq, location)
+						if err == nil {
+							fmt.Printf("<-- %v %+v\n", rsp.Status, rsp.Header)
+						}
+					}
+				}
+				success = rsp.StatusCode == 200
+			}
+			if err != nil {
+				fmt.Printf("<-- Error: %s\n", err.Error())
+			}
+
+			index += 1
+
+		}
+
+		if err != nil {
+			httpError := echo.NewHTTPError(http.StatusBadGateway, fmt.Sprintf("request to upstream server failed: %v", err))
+			httpError.Internal = err
+			return httpError
+		}
+
+		// copy response to client
+		headers := clientResp.Header()
+		for _, name := range allowedResponseHeaders {
+			if value, ok := rsp.Header[name]; ok {
+				headers[name] = value
+			}
+		}
+		clientResp.WriteHeader(rsp.StatusCode)
+		if rsp.ContentLength > 0 {
+			// ignore errors, since there's nothing we can do
+			io.CopyN(clientResp.Writer, rsp.Body, rsp.ContentLength) //nolint:golint,errcheck
+		}
+
+		return nil
 	}
 }
 
-// Proxy request to upstream
-func (pp *pkgProxy) Proxy(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		req := c.Request()
-
-		if !pp.isRepositoryRequest(req.RequestURI) {
-			fmt.Println("Upstream(): exec next() middleware")
-			return next(c)
+func (pp *pkgProxy) forwardClientRequestToOrigin(req *http.Request, origin *url.URL) (*http.Response, error) {
+	// Construct filtered header to send to origin server
+	headers := http.Header{}
+	for _, name := range allowedRequestHeaders {
+		if value, ok := req.Header[name]; ok {
+			headers[name] = value
 		}
-
-		target, _ := url.Parse(req.URL.Scheme + "://" + req.Host)
-		followRedirect := transport{RT: http.DefaultTransport}
-
-		var err error
-		proxyHTTP(target, c, &followRedirect).ServeHTTP(c.Response(), c.Request())
-		if e, ok := c.Get("_error").(error); ok {
-			err = e
-		}
-
-		return err
 	}
+
+	fmt.Printf("--> %v %v\n", req.Method, origin)
+	// Construct request to send to origin server
+	return pp.transport.RoundTrip(&http.Request{
+		Body:          req.Body,
+		Close:         req.Close,
+		ContentLength: req.ContentLength,
+		Header:        headers,
+		Method:        req.Method,
+		URL:           origin,
+	})
 }
 
 // Check if the request should be handled by PkgProxy
 func (pp *pkgProxy) isRepositoryRequest(uri string) bool {
 	repo := getRepofromUri(uri)
-	return utils.Contains(utils.KeysFromMap(pp.Upstreams), repo)
+	return utils.Contains(utils.KeysFromMap(pp.upstreams), repo)
 }
 
 // Return the repository name of the URL without leading "/"
 func getRepofromUri(uri string) string {
 	return strings.TrimPrefix(utils.RouteFromUri(uri), "/")
-}
-
-func proxyHTTP(target *url.URL, c echo.Context, transport *transport) http.Handler {
-	proxy := httputil.NewSingleHostReverseProxy(target)
-	proxy.ErrorHandler = func(resp http.ResponseWriter, req *http.Request, err error) {
-		// If the client canceled the request (usually by closing the connection), we can report a
-		// client error (4xx) instead of a server error (5xx) to correctly identify the situation.
-		// The Go standard library (at of late 2020) wraps the exported, standard
-		// context.Canceled error with unexported garbage value requiring a substring check, see
-		// https://github.com/golang/go/blob/6965b01ea248cabb70c3749fd218b36089a21efb/src/net/net.go#L416-L430
-		if err == context.Canceled || strings.Contains(err.Error(), "operation was canceled") {
-			httpError := echo.NewHTTPError(middleware.StatusCodeContextCanceled, fmt.Sprintf("client closed connection: %v", err))
-			httpError.Internal = err
-			c.Set("_error", httpError)
-		} else {
-			httpError := echo.NewHTTPError(http.StatusBadGateway, fmt.Sprintf("upstream %s unreachable, could not forward: %v", target.Host, err))
-			httpError.Internal = err
-			c.Set("_error", httpError)
-		}
-	}
-	proxy.Transport = transport
-	return proxy
 }
