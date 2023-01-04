@@ -70,7 +70,7 @@ baseurl=http://<pkgproxy>:8080/centos/$releasever/os/$basearch/
 - CentOS Stream 8: `/etc/yum.repos.d/CentOS-Stream-BaseOS.repo` (adjust other repositories accordingly):
 ```
 [baseos]
-#mirrorlist=http://mirrorlist.centos.org/?release=$stream&arch=$basearch&repo=BaseOS&infra=$infra
+# mirrorlist=http://mirrorlist.centos.org/?release=$stream&arch=$basearch&repo=BaseOS&infra=$infra
 baseurl=http://<pkgproxy>:8080/centos/$stream/BaseOS/$basearch/os/
 ```
 
@@ -98,6 +98,16 @@ baseurl=http://<pkgproxy>:8080/epel/$releasever/Everything/$basearch/
 # metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch
 baseurl=http://<pkgproxy>:8080/fedora/releases/$releasever/Everything/$basearch/os/
 ```
+
+### Fedora COPR
+
+`/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:<user>:<repo>.repo` (replace `<user>` and `<repo>` with the corresponding [COPR](https://copr.fedorainfracloud.org/coprs/) repository):
+```
+[copr:copr.fedorainfracloud.org:<user>:<repo>]
+# baseurl=https://download.copr.fedorainfracloud.org/results/<user>/<repo>/fedora-$releasever-$basearch/
+baseurl=http://<pkgproxy>:8080/copr/<user>/<repo>/fedora-$releasever-$basearch/
+```
+For Enterprise distributions the URL suffix `epel-$releasever-$basearch` must be used.
 
 ### Rocky Linux
 
