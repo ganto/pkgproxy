@@ -70,7 +70,7 @@ baseurl=http://<pkgproxy>:8080/centos/$releasever/os/$basearch/
 - CentOS Stream 8: `/etc/yum.repos.d/CentOS-Stream-BaseOS.repo` (adjust other repositories accordingly):
 ```
 [baseos]
-#mirrorlist=http://mirrorlist.centos.org/?release=$stream&arch=$basearch&repo=BaseOS&infra=$infra
+# mirrorlist=http://mirrorlist.centos.org/?release=$stream&arch=$basearch&repo=BaseOS&infra=$infra
 baseurl=http://<pkgproxy>:8080/centos/$stream/BaseOS/$basearch/os/
 ```
 
