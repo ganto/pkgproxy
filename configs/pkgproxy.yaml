@@ -30,6 +30,11 @@ repositories:
     mirrors:
       - https://linuxsoft.cern.ch/centos-stream/
       - https://mirror.stream.centos.org/
+  copr:
+    suffixes:
+      - .rpm
+    mirrors:
+      - https://copr-be.cloud.fedoraproject.org/results/
   debian:
     suffixes:
       - .deb

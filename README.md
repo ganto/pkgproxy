@@ -99,6 +99,16 @@ baseurl=http://<pkgproxy>:8080/epel/$releasever/Everything/$basearch/
 baseurl=http://<pkgproxy>:8080/fedora/releases/$releasever/Everything/$basearch/os/
 ```
 
+### Fedora COPR
+
+`/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:<user>:<repo>.repo` (replace `<user>` and `<repo>` with the corresponding [COPR](https://copr.fedorainfracloud.org/coprs/) repository):
+```
+[copr:copr.fedorainfracloud.org:<user>:<repo>]
+# baseurl=https://download.copr.fedorainfracloud.org/results/<user>/<repo>/fedora-$releasever-$basearch/
+baseurl=http://<pkgproxy>:8080/copr/<user>/<repo>/fedora-$releasever-$basearch/
+```
+For Enterprise distributions the URL suffix `epel-$releasever-$basearch` must be used.
+
 ### Rocky Linux
 
 `/etc/yum.repos.d/rocky.repo` (adjust other repositories accordingly):
