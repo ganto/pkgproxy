@@ -158,7 +158,7 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		if pp.isRepositoryRequest(uri) {
-			if repoCache.IsCacheCandidate(uri) && !repoCache.IsCached(uri) && len(rspBody.Bytes()) > 0 {
+			if repoCache.IsCacheCandidate(uri) && !repoCache.IsCached(uri) && (c.Response().Status == 200) && len(rspBody.Bytes()) > 0 {
 				timestamp := time.Now().Local()
 				if c.Response().Header().Get("Last-Modified") != "" {
 					timestamp, _ = http.ParseTime(c.Response().Header().Get("Last-Modified"))
