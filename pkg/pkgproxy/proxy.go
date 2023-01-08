@@ -127,11 +127,21 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 			repoCache = pp.upstreams[getRepofromUri(uri)].cache
 
 			if repoCache.IsCacheCandidate(uri) {
-				// serve from cache if possible
 				if repoCache.IsCached(uri) {
+					// serve or delete from cache
+					if c.Request().Method == "DELETE" {
+						fmt.Printf("--> DELETE %s\n", uri)
+						if err := repoCache.DeleteFile(uri); err != nil {
+							return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
+						}
+						return c.JSON(http.StatusOK, map[string]string{"message": "Success"})
+					}
 					return c.File(repoCache.GetFilePath(uri))
 
 				} else {
+					if c.Request().Method == "DELETE" {
+						return c.JSON(http.StatusNotFound, map[string]string{"message": "Not Found"})
+					}
 					// if not in cache write response body to buffer
 					rspBody = new(bytes.Buffer)
 					bodyWriter := io.MultiWriter(c.Response().Writer, rspBody)

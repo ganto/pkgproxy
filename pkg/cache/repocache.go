@@ -15,6 +15,7 @@ import (
 )
 
 type Cache interface {
+	DeleteFile(string) error
 	GetFilePath(string) string
 	IsCacheCandidate(string) bool
 	IsCached(string) bool
@@ -34,6 +35,13 @@ func New(cfg *CacheConfig) Cache {
 	return &repoCache{
 		config: cfg,
 	}
+}
+
+// Delete file from cache
+func (rc *repoCache) DeleteFile(uri string) error {
+	path := rc.GetFilePath(uri)
+	fmt.Printf("<== deleting file: %s\n", path)
+	return os.Remove(path)
 }
 
 // Returns the path to the cached file
