@@ -43,6 +43,19 @@ type (
 )
 
 var (
+	// HTTP methods that are allowed for the cache
+	allowedCacheMethods = []string{
+		"GET",
+		"HEAD",
+		"DELETE",
+	}
+
+	// HTTP methods that are allowed for the proxy
+	allowedProxyMethods = []string{
+		"GET",
+		"HEAD",
+	}
+
 	// HTTP request headers that will be forwarded to origin server
 	allowedRequestHeaders = []string{
 		"Accept",
@@ -124,6 +137,9 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 		uri := strings.Clone(c.Request().RequestURI)
 
 		if pp.isRepositoryRequest(uri) {
+			if !utils.Contains(allowedCacheMethods, c.Request().Method) {
+				return c.JSON(http.StatusMethodNotAllowed, map[string]string{"message": fmt.Sprintf("Cache does not allow method %s\n", c.Request().Method)})
+			}
 			repoCache = pp.upstreams[getRepofromUri(uri)].cache
 
 			if repoCache.IsCacheCandidate(uri) {
@@ -183,6 +199,10 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 
 		if !pp.isRepositoryRequest(clientReq.RequestURI) {
 			return next(c)
+		}
+
+		if !utils.Contains(allowedProxyMethods, c.Request().Method) {
+			return c.JSON(http.StatusMethodNotAllowed, map[string]string{"message": fmt.Sprintf("Forward proxy does not allow method %s\n", c.Request().Method)})
 		}
 
 		var rsp *http.Response
