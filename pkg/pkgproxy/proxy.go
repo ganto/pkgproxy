@@ -235,6 +235,7 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 					if err == nil {
 						rsp, err = pp.forwardClientRequestToOrigin(clientReq, location)
 						if err == nil {
+							defer rsp.Body.Close()
 							fmt.Printf("<-- %v %+v\n", rsp.Status, rsp.Header)
 						}
 					}
@@ -265,7 +266,9 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 		clientResp.WriteHeader(rsp.StatusCode)
 		if rsp.ContentLength > 0 {
 			// ignore errors, since there's nothing we can do
-			io.CopyN(clientResp.Writer, rsp.Body, rsp.ContentLength) //nolint:golint,errcheck
+			bodyBytes, _ := io.ReadAll(rsp.Body)
+			size, _ := io.CopyN(clientResp.Writer, bytes.NewReader(bodyBytes), rsp.ContentLength)
+			clientResp.Size = size
 		}
 
 		return nil
