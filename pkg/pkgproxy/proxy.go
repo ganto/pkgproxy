@@ -43,6 +43,19 @@ type (
 )
 
 var (
+	// HTTP methods that are allowed for the cache
+	allowedCacheMethods = []string{
+		"GET",
+		"HEAD",
+		"DELETE",
+	}
+
+	// HTTP methods that are allowed for the proxy
+	allowedProxyMethods = []string{
+		"GET",
+		"HEAD",
+	}
+
 	// HTTP request headers that will be forwarded to origin server
 	allowedRequestHeaders = []string{
 		"Accept",
@@ -124,14 +137,27 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 		uri := strings.Clone(c.Request().RequestURI)
 
 		if pp.isRepositoryRequest(uri) {
+			if !utils.Contains(allowedCacheMethods, c.Request().Method) {
+				return c.JSON(http.StatusMethodNotAllowed, map[string]string{"message": fmt.Sprintf("Cache does not allow method %s\n", c.Request().Method)})
+			}
 			repoCache = pp.upstreams[getRepofromUri(uri)].cache
 
 			if repoCache.IsCacheCandidate(uri) {
-				// serve from cache if possible
 				if repoCache.IsCached(uri) {
+					// serve or delete from cache
+					if c.Request().Method == "DELETE" {
+						fmt.Printf("--> DELETE %s\n", uri)
+						if err := repoCache.DeleteFile(uri); err != nil {
+							return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
+						}
+						return c.JSON(http.StatusOK, map[string]string{"message": "Success"})
+					}
 					return c.File(repoCache.GetFilePath(uri))
 
 				} else {
+					if c.Request().Method == "DELETE" {
+						return c.JSON(http.StatusNotFound, map[string]string{"message": "Not Found"})
+					}
 					// if not in cache write response body to buffer
 					rspBody = new(bytes.Buffer)
 					bodyWriter := io.MultiWriter(c.Response().Writer, rspBody)
@@ -148,7 +174,7 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		if pp.isRepositoryRequest(uri) {
-			if repoCache.IsCacheCandidate(uri) && !repoCache.IsCached(uri) && len(rspBody.Bytes()) > 0 {
+			if repoCache.IsCacheCandidate(uri) && !repoCache.IsCached(uri) && (c.Response().Status == 200) && len(rspBody.Bytes()) > 0 {
 				timestamp := time.Now().Local()
 				if c.Response().Header().Get("Last-Modified") != "" {
 					timestamp, _ = http.ParseTime(c.Response().Header().Get("Last-Modified"))
@@ -173,6 +199,10 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 
 		if !pp.isRepositoryRequest(clientReq.RequestURI) {
 			return next(c)
+		}
+
+		if !utils.Contains(allowedProxyMethods, c.Request().Method) {
+			return c.JSON(http.StatusMethodNotAllowed, map[string]string{"message": fmt.Sprintf("Forward proxy does not allow method %s\n", c.Request().Method)})
 		}
 
 		var rsp *http.Response
