@@ -264,10 +264,10 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 		}
 		clientResp.WriteHeader(rsp.StatusCode)
-		if rsp.ContentLength > 0 {
+		bodyBytes, _ := io.ReadAll(rsp.Body)
+		if len(bodyBytes) > 0 {
 			// ignore errors, since there's nothing we can do
-			bodyBytes, _ := io.ReadAll(rsp.Body)
-			size, _ := io.CopyN(clientResp.Writer, bytes.NewReader(bodyBytes), rsp.ContentLength)
+			size, _ := io.CopyN(clientResp.Writer, bytes.NewReader(bodyBytes), int64(len(bodyBytes)))
 			clientResp.Size = size
 		}
 
