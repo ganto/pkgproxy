@@ -64,6 +64,7 @@ var (
 		"Authorization",
 		"Cache-Control",
 		"Cookie",
+		"Range",
 		"Referer",
 		"User-Agent",
 	}
