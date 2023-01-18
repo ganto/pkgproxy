@@ -37,7 +37,7 @@ type (
 		upstreams map[string]upstream
 	}
 	upstream struct {
-		cache   cache.Cache
+		cache   cache.FileCache
 		mirrors []*url.URL
 	}
 )
@@ -131,7 +131,7 @@ func New(config *PkgProxyConfig) PkgProxy {
 // response is cached if necessary.
 func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		var repoCache cache.Cache
+		var repoCache cache.FileCache
 		var rspBody *bytes.Buffer
 
 		// the request URI might be changed later, keep the original value
