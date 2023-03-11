@@ -1,4 +1,4 @@
-
+---
 name: CI
 
 on:
@@ -8,13 +8,11 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read  # for golangci/golangci-lint-action to fetch pull requests
 
 jobs:
 
   golangci-lint:
-    permissions:
-      contents: read  # for actions/checkout to fetch code
-      pull-requests: read  # for golangci/golangci-lint-action to fetch pull requests
     runs-on: ubuntu-latest
     steps:
 
@@ -22,11 +20,7 @@ jobs:
 
       - uses: actions/setup-go@v3
         with:
-          go-version-file: go.mod
           check-latest: true
-          cache: true
-
-      - uses: actions/checkout@v3
 
       - uses: golangci/golangci-lint-action@v3.4.0
         with:
@@ -37,15 +31,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - uses: actions/setup-go@v3
-      with:
-        go-version-file: go.mod
-        cache: true
+      - uses: actions/setup-go@v3
 
-    - run: |
-        export GOBIN=$HOME/go/bin
-        go install github.com/kyoh86/richgo@latest
+      - run: |
+          export GOBIN=$HOME/go/bin
+          go install github.com/kyoh86/richgo@latest
 
-    - run: RICHGO_FORCE_COLOR=1 PATH=$HOME/go/bin/:$PATH make richtest
+      - run: RICHGO_FORCE_COLOR=1 PATH=$HOME/go/bin/:$PATH make richtest
