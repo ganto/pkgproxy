@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/labstack/gommon v0.4.0
-	github.com/spf13/cobra v1.6.1
+	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.2
 	golang.org/x/exp v0.0.0-20230304125523-9ff063c70017
 	gopkg.in/yaml.v3 v3.0.1
