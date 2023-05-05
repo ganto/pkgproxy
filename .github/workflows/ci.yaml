@@ -12,7 +12,7 @@ permissions:
 
 jobs:
 
-  golangci-lint:
+  pre-commit:
     runs-on: ubuntu-latest
     steps:
 
@@ -21,6 +21,16 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           check-latest: true
+
+      - uses: pre-commit/action@v3.0.0
+
+  golangci-lint:
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v4
 
       - uses: golangci/golangci-lint-action@v3.4.0
         with:
