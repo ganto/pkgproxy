@@ -22,7 +22,7 @@ jobs:
         with:
           check-latest: true
 
-      - uses: pre-commit/action@v3.0.0
+      - uses: pre-commit/action@v3.0.1
 
   golangci-lint:
     runs-on: ubuntu-latest
