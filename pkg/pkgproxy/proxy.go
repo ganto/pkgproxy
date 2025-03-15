@@ -154,7 +154,6 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 						return c.JSON(http.StatusOK, map[string]string{"message": "Success"})
 					}
 					return c.File(repoCache.GetFilePath(uri))
-
 				} else {
 					if c.Request().Method == "DELETE" {
 						return c.JSON(http.StatusNotFound, map[string]string{"message": "Not Found"})
@@ -248,7 +247,6 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 
 			index += 1
-
 		}
 
 		if err != nil {
