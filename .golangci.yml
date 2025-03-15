@@ -1,0 +1,123 @@
+# Options for analysis running.
+run:
+  # If set, we pass it to "go list -mod={option}". From "go help modules":
+  # If invoked with -mod=readonly, the go command is disallowed from the implicit
+  # automatic updating of go.mod described above. Instead, it fails when any changes
+  # to go.mod are needed. This setting is most useful to check that go.mod does not
+  # need updates, such as in a continuous integration and testing system.
+  # If invoked with -mod=vendor, the go command assumes that the vendor directory
+  # holds the correct copies of dependencies and ignores the dependency descriptions
+  # in go.mod.
+  #
+  # Allowed values: readonly|vendor|mod
+  # Default: ""
+  modules-download-mode: readonly
+
+  # Include test files or not.
+  # Default: true
+  tests: false
+
+  # Timeout for analysis, e.g. 30s, 5m.
+  # Default: 1m
+  timeout: 5m
+
+issues:
+  # Maximum issues count per one linter.
+  # Set to 0 to disable.
+  # Default: 50
+  max-issues-per-linter: 0
+
+  # Maximum count of issues with the same text.
+  # Set to 0 to disable.
+  # Default: 3
+  max-same-issues: 0
+
+linters:
+  # Disable all linters.
+  # Default: false
+  disable-all: true
+
+  # Enable specific linter
+  # https://golangci-lint.run/usage/linters/
+  enable:
+    ##
+    # Default linters
+    ##
+    # Check for unchecked errors in Go code
+    - errcheck
+    # Linter for Go source code that specializes in simplifying code
+    - gosimple
+    # Vet examines Go source code and reports suspicious constructs
+    - govet
+    # Detects when assignments to existing variables are not used
+    - ineffassign
+    # Set of rules from staticcheck (https://staticcheck.io/docs/configuration/options/#checks)
+    - staticcheck
+    # Checks Go code for unused constants, variables, functions and types
+    - unused
+
+    ##
+    # Additional linters
+    ##
+    # Tool for code clone detection
+    - dupl
+    # Checks for pointers to enclosing loop variables
+    #- exportloopref
+    # Finds repeated strings that could be replaced by a constant
+    - goconst
+    # Computes and checks the cyclomatic complexity of functions
+    - gocyclo
+    # Tool for detection of FIXME, TODO and other comment keywords
+    - godox
+    # Gofmt checks whether code was gofmt-ed
+    - gofmt
+    # Check import statements are formatted according to the 'goimport' command
+    - goimports
+    # Inspects source code for security problems
+    - gosec
+    # Finds commonly misspelled English words
+    - misspell
+    # Finds slice declarations that could potentially be pre-allocated
+    - prealloc
+    # Checks whether Rows.Err of rows is checked successfully
+    - rowserrcheck
+    # Remove unnecessary type conversions
+    - unconvert
+    # Reports unused function parameters
+    - unparam
+    # Check for unnecessary newlines at the start and end of functions, if, for, etc.
+    - whitespace
+
+linters-settings:
+
+  goconst:
+    # Minimal length of string constant.
+    # Default: 3
+    min-len: 2
+    # Minimum occurrences of constant string count to trigger issue.
+    # Default: 3
+    min-occurrences: 3
+
+  gosimple:
+    # Sxxxx checks in https://staticcheck.io/docs/configuration/options/#checks
+    # Default: ["*"]
+    checks: ["all"]
+
+  govet:
+    # Settings per analyzer
+    settings:
+      # Analyzer name, run `go tool vet help` to see all analyzers
+      printf:
+        # Comma-separated list of print function names to check (in addition to default, see `go tool vet help printf`).
+        # Default: []
+        funcs:
+          - (github.com/sirupsen/logrus).Debugf
+          - (github.com/sirupsen/logrus).Infof
+          - (github.com/sirupsen/logrus).Warnf
+          - (github.com/sirupsen/logrus).Errorf
+          - (github.com/sirupsen/logrus).Fatalf
+
+  staticcheck:
+    # SAxxxx checks in https://staticcheck.io/docs/configuration/options/#checks
+    # Default: ["*"]
+    checks: ["all"]

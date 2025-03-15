@@ -45,8 +45,4 @@ jobs:
 
       - uses: actions/setup-go@v5
 
-      - run: |
-          export GOBIN=$HOME/go/bin
-          go install github.com/kyoh86/richgo@latest
-
-      - run: RICHGO_FORCE_COLOR=1 PATH=$HOME/go/bin/:$PATH make richtest
+      - run: make test
