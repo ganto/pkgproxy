@@ -68,7 +68,7 @@ ci-lint: ## Run all lint related tests against the codebase (will use the .golan
 	$(info *****************************************************)
 	$(info ********** EXECUTING 'ci-lint' MAKE TARGET **********)
 	$(info *****************************************************)
-	@command -v golangci-lint 2>&1 >/dev/null || go install $(GO_INSTALL_ARGS) $(GO_INSTALL_ARGS_EXTRA) github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@command -v golangci-lint 2>&1 >/dev/null || go install $(GO_INSTALL_ARGS) $(GO_INSTALL_ARGS_EXTRA) github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 	golangci-lint -v run
 
 .PHONY: ci-check

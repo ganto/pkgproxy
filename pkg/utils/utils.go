@@ -9,7 +9,7 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-// Check if slice contains element
+// Contains checks if slice contains element
 func Contains[T comparable](s []T, e T) bool {
 	for _, i := range s {
 		if i == e {
@@ -19,7 +19,7 @@ func Contains[T comparable](s []T, e T) bool {
 	return false
 }
 
-// Return a list of the keys of a map
+// KeysFromMap returns a list of the keys of a map
 func KeysFromMap[T constraints.Ordered, S any](a map[T]S) []T {
 	keys := make([]T, len(a))
 
@@ -35,7 +35,8 @@ func KeysFromMap[T constraints.Ordered, S any](a map[T]S) []T {
 	return keys
 }
 
-// Return the difference of 2 lists (items in `a` that don’t exist in `b`)
+// ListDifference returns the difference of 2 lists (items in `a` that don’t
+// exist in `b`)
 func ListDifference[T comparable](a []T, b []T) []T {
 	lookup := make(map[T]bool)
 	set := make([]T, 0)
@@ -52,7 +53,8 @@ func ListDifference[T comparable](a []T, b []T) []T {
 	return set
 }
 
-// Return the intersection of 2 lists (unique list of all items in both)
+// ListIntersection returns the intersection of 2 lists (unique list of all
+// items in both)
 func ListIntersection[T comparable](a []T, b []T) []T {
 	lookup := make(map[T]bool)
 	set := make([]T, 0)
@@ -69,9 +71,9 @@ func ListIntersection[T comparable](a []T, b []T) []T {
 	return set
 }
 
-// FilenameFromUri returns the last element of an URI
+// FilenameFromURI returns the last element of an URI
 // If the URI is empty, FilenameFromUri returns "/".
-func FilenameFromUri(uri string) string {
+func FilenameFromURI(uri string) string {
 	file := "/"
 
 	if len(uri) == 0 || uri[len(uri)-1:] == "/" {
@@ -85,9 +87,9 @@ func FilenameFromUri(uri string) string {
 	return file
 }
 
-// FilepathFromUri returns all but the last element of an URI
-// If the URI is empty, FilepathFromUri returns "/".
-func FilepathFromUri(uri string) string {
+// FilepathFromURI returns all but the last element of an URI
+// If the URI is empty, FilepathFromURI returns "/".
+func FilepathFromURI(uri string) string {
 	path := "/"
 
 	if len(uri) == 0 {
@@ -104,8 +106,8 @@ func FilepathFromUri(uri string) string {
 	return path
 }
 
-// RouteFromUri returns the element before the second "/".
-func RouteFromUri(uri string) string {
+// RouteFromURI returns the element before the second "/".
+func RouteFromURI(uri string) string {
 	route := "/"
 
 	path := strings.Split(uri, "/")

@@ -141,7 +141,7 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 			if !utils.Contains(allowedCacheMethods, c.Request().Method) {
 				return c.JSON(http.StatusMethodNotAllowed, map[string]string{"message": fmt.Sprintf("Cache does not allow method %s\n", c.Request().Method)})
 			}
-			repoCache = pp.upstreams[getRepofromUri(uri)].cache
+			repoCache = pp.upstreams[getRepoFromURI(uri)].cache
 
 			if repoCache.IsCacheCandidate(uri) {
 				if repoCache.IsCached(uri) {
@@ -208,7 +208,7 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 		var rsp *http.Response
 		var err error
 
-		repo := getRepofromUri(clientReq.RequestURI)
+		repo := getRepoFromURI(clientReq.RequestURI)
 		success := false
 		index := 0
 
@@ -297,11 +297,11 @@ func (pp *pkgProxy) forwardClientRequestToOrigin(req *http.Request, origin *url.
 
 // Check if the request should be handled by PkgProxy
 func (pp *pkgProxy) isRepositoryRequest(uri string) bool {
-	repo := getRepofromUri(uri)
+	repo := getRepoFromURI(uri)
 	return utils.Contains(utils.KeysFromMap(pp.upstreams), repo)
 }
 
 // Return the repository name of the URL without leading "/"
-func getRepofromUri(uri string) string {
-	return strings.TrimPrefix(utils.RouteFromUri(uri), "/")
+func getRepoFromURI(uri string) string {
+	return strings.TrimPrefix(utils.RouteFromURI(uri), "/")
 }

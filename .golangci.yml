@@ -1,4 +1,10 @@
 # Options for analysis running.
+
+# Defines the configuration version.
+# The only possible value is "2".
+version: "2"
+
+# Options for analysis running.
 run:
   # If set, we pass it to "go list -mod={option}". From "go help modules":
   # If invoked with -mod=readonly, the go command is disallowed from the implicit
@@ -17,10 +23,6 @@ run:
   # Default: true
   tests: false
 
-  # Timeout for analysis, e.g. 30s, 5m.
-  # Default: 1m
-  timeout: 5m
-
 issues:
   # Maximum issues count per one linter.
   # Set to 0 to disable.
@@ -32,10 +34,18 @@ issues:
   # Default: 3
   max-same-issues: 0
 
+formatters:
+  # Enable specific formatter.
+  # Default: [] (uses standard Go formatting)
+  enable:
+    - gofmt
+    - goimports
+
 linters:
-  # Disable all linters.
-  # Default: false
-  disable-all: true
+  # Default set of linters.
+  # The value can be: `standard`, `all`, `none`, or `fast`.
+  # Default: standard
+  default: none
 
   # Enable specific linter
   # https://golangci-lint.run/usage/linters/
@@ -45,8 +55,6 @@ linters:
     ##
     # Check for unchecked errors in Go code
     - errcheck
-    # Linter for Go source code that specializes in simplifying code
-    - gosimple
     # Vet examines Go source code and reports suspicious constructs
     - govet
     # Detects when assignments to existing variables are not used
@@ -59,24 +67,28 @@ linters:
     ##
     # Additional linters
     ##
+    # Checks whether HTTP response body is closed successfully
+    - bodyclose
     # Tool for code clone detection
     - dupl
-    # Checks for pointers to enclosing loop variables
-    #- exportloopref
+    # Checks types passed to the json encoding functions.
+    - errchkjson
     # Finds repeated strings that could be replaced by a constant
     - goconst
     # Computes and checks the cyclomatic complexity of functions
     - gocyclo
     # Tool for detection of FIXME, TODO and other comment keywords
     - godox
-    # Gofmt checks whether code was gofmt-ed
-    - gofmt
-    # Check import statements are formatted according to the 'goimport' command
-    - goimports
     # Inspects source code for security problems
     - gosec
     # Finds commonly misspelled English words
     - misspell
+    # Finds the code that returns nil even if it checks that the error is not nil
+    - nilerr
+    # Reports ill-formed or insufficient nolint directives.
+    - nolintlint
+    # Checks that fmt.Sprintf can be replaced with a faster alternative
+    - perfsprint
     # Finds slice declarations that could potentially be pre-allocated
     - prealloc
     # Checks whether Rows.Err of rows is checked successfully
@@ -88,36 +100,43 @@ linters:
     # Check for unnecessary newlines at the start and end of functions, if, for, etc.
     - whitespace
 
-linters-settings:
+  # Settings of specific linters
+  settings:
 
-  goconst:
-    # Minimal length of string constant.
-    # Default: 3
-    min-len: 2
-    # Minimum occurrences of constant string count to trigger issue.
-    # Default: 3
-    min-occurrences: 3
+    errcheck:
+      # List of functions to exclude from checking, where each entry is a single function to exclude.
+      # See https://github.com/kisielk/errcheck#excluding-functions for details.
+      exclude-functions:
+        - (io.ReadCloser).Close
+        - (io.WriteCloser).Close
+        - (io.ReadWriteCloser).Close
+        - (*os.File).Close
 
-  gosimple:
-    # Sxxxx checks in https://staticcheck.io/docs/configuration/options/#checks
-    # Default: ["*"]
-    checks: ["all"]
+    goconst:
+      # Minimal length of string constant.
+      # Default: 3
+      min-len: 2
+      # Minimum occurrences of constant string count to trigger issue.
+      # Default: 3
+      min-occurrences: 3
 
-  govet:
-    # Settings per analyzer
-    settings:
-      # Analyzer name, run `go tool vet help` to see all analyzers
-      printf:
-        # Comma-separated list of print function names to check (in addition to default, see `go tool vet help printf`).
-        # Default: []
-        funcs:
-          - (github.com/sirupsen/logrus).Debugf
-          - (github.com/sirupsen/logrus).Infof
-          - (github.com/sirupsen/logrus).Warnf
-          - (github.com/sirupsen/logrus).Errorf
-          - (github.com/sirupsen/logrus).Fatalf
+    govet:
+      # Settings per analyzer
+      settings:
+        # Analyzer name, run `go tool vet help` to see all analyzers
+        printf:
+          # Comma-separated list of print function names to check (in addition to default, see `go tool vet help printf`).
+          # Default: []
+          funcs:
+            - (github.com/sirupsen/logrus).Debugf
+            - (github.com/sirupsen/logrus).Infof
+            - (github.com/sirupsen/logrus).Warnf
+            - (github.com/sirupsen/logrus).Errorf
+            - (github.com/sirupsen/logrus).Fatalf
 
-  staticcheck:
-    # SAxxxx checks in https://staticcheck.io/docs/configuration/options/#checks
-    # Default: ["*"]
-    checks: ["all"]
+    staticcheck:
+      # SAxxxx checks in https://staticcheck.io/docs/configuration/options/#checks
+      # Default: ["all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
+      checks:
+        - all
+        - "-ST1000"   # Packages must have a package comment that is formatted according to the guidelines
