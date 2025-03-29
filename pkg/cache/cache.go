@@ -105,7 +105,7 @@ func (c *cache) SaveToDisk(uri string, buffer *bytes.Buffer, fileTime time.Time)
 	filePath := path.Join(c.getBasePath(), uri)
 
 	if _, err := os.Stat(path.Dir(filePath)); errors.Is(err, os.ErrNotExist) {
-		if err := os.MkdirAll(path.Dir(filePath), os.ModePerm); err != nil {
+		if err := os.MkdirAll(path.Dir(filePath), 0o750); err != nil {
 			return err
 		}
 	}
