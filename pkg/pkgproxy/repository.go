@@ -23,11 +23,11 @@ type Repository struct {
 }
 
 func LoadConfig(config *RepoConfig, path string) error {
-	fullPath, err := filepath.Abs(path)
+	fullPath, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
 		return err
 	}
-	file, err := os.ReadFile(fullPath)
+	file, err := os.ReadFile(fullPath) //nolint:gosec
 	if err != nil {
 		return err
 	}

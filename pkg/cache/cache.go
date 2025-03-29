@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -102,7 +103,7 @@ func (c *cache) IsCached(uri string) bool {
 
 // Saves buffer to file
 func (c *cache) SaveToDisk(uri string, buffer *bytes.Buffer, fileTime time.Time) error {
-	filePath := path.Join(c.getBasePath(), uri)
+	filePath := filepath.Clean(path.Join(c.getBasePath(), uri))
 
 	if _, err := os.Stat(path.Dir(filePath)); errors.Is(err, os.ErrNotExist) {
 		if err := os.MkdirAll(path.Dir(filePath), 0o750); err != nil {
