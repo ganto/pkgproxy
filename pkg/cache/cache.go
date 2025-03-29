@@ -78,7 +78,7 @@ func (c *cache) GetFileSuffixes() []string {
 func (c *cache) IsCacheCandidate(uri string) bool {
 	ca := false
 
-	name := utils.FilenameFromUri(uri)
+	name := utils.FilenameFromURI(uri)
 	for _, suffix := range c.GetFileSuffixes() {
 		if strings.HasSuffix(name, suffix) {
 			ca = true

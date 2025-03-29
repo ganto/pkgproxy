@@ -60,79 +60,79 @@ func TestListIntersection(t *testing.T) {
 func TestFilenameFromUri(t *testing.T) {
 	s := "http://foo.bar/foobar?foo#bar"
 	u, _ := url.Parse(s)
-	f := FilenameFromUri(u.Path)
+	f := FilenameFromURI(u.Path)
 	assert.Equal(t, f, "foobar")
 
 	s = "http://foob.ar/foo.bar"
 	u, _ = url.Parse(s)
-	f = FilenameFromUri(u.Path)
+	f = FilenameFromURI(u.Path)
 	assert.Equal(t, f, "foo.bar")
 
 	s = "http://foob.ar/foo.bar/"
 	u, _ = url.Parse(s)
-	f = FilenameFromUri(u.Path)
+	f = FilenameFromURI(u.Path)
 	assert.Equal(t, f, "/")
 
 	s = "http://foo.bar/"
 	u, _ = url.Parse(s)
-	f = FilenameFromUri(u.Path)
+	f = FilenameFromURI(u.Path)
 	assert.Equal(t, f, "/")
 
-	f = FilenameFromUri("")
+	f = FilenameFromURI("")
 	assert.Equal(t, f, "/")
 }
 
-func TestFilepathFromUri(t *testing.T) {
+func TestFilepathFromURI(t *testing.T) {
 	s := "http://foo.bar/foobaz/foobar?foo#bar"
 	u, _ := url.Parse(s)
-	f := FilepathFromUri(u.Path)
+	f := FilepathFromURI(u.Path)
 	assert.Equal(t, f, "/foobaz")
 
 	s = "http://foo.bar/foobaz/foobar/baz?foo#bar"
 	u, _ = url.Parse(s)
-	f = FilepathFromUri(u.Path)
+	f = FilepathFromURI(u.Path)
 	assert.Equal(t, f, "/foobaz/foobar")
 
 	s = "http://foob.ar/foo.bar"
 	u, _ = url.Parse(s)
-	f = FilepathFromUri(u.Path)
+	f = FilepathFromURI(u.Path)
 	assert.Equal(t, f, "/")
 
 	s = "http://foob.ar/foo.bar/"
 	u, _ = url.Parse(s)
-	f = FilepathFromUri(u.Path)
+	f = FilepathFromURI(u.Path)
 	assert.Equal(t, f, "/foo.bar")
 
 	s = "http://foo.bar/"
 	u, _ = url.Parse(s)
-	f = FilepathFromUri(u.Path)
+	f = FilepathFromURI(u.Path)
 	assert.Equal(t, f, "/")
 
-	f = FilepathFromUri("")
+	f = FilepathFromURI("")
 	assert.Equal(t, f, "/")
 }
 
-func TestRouteFromUri(t *testing.T) {
+func TestRouteFromURI(t *testing.T) {
 	s := "http://foo.bar/foobaz/foobar?foo#bar"
 	u, _ := url.Parse(s)
-	f := RouteFromUri(u.Path)
+	f := RouteFromURI(u.Path)
 	assert.Equal(t, f, "/foobaz")
 
 	s = "http://foo.bar/foobaz/foobar/baz?foo#bar"
 	u, _ = url.Parse(s)
-	f = RouteFromUri(u.Path)
+	f = RouteFromURI(u.Path)
 	assert.Equal(t, f, "/foobaz")
 
 	s = "http://foob.ar/foo.bar"
 	u, _ = url.Parse(s)
-	f = RouteFromUri(u.Path)
+	f = RouteFromURI(u.Path)
 	assert.Equal(t, f, "/foo.bar")
 
 	s = "http://foo.bar/"
 	u, _ = url.Parse(s)
-	f = RouteFromUri(u.Path)
+	f = RouteFromURI(u.Path)
 	assert.Equal(t, f, "/")
 
-	f = RouteFromUri("")
+	f = RouteFromURI("")
 	assert.Equal(t, f, "/")
 }

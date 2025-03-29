@@ -69,9 +69,9 @@ func ListIntersection[T comparable](a []T, b []T) []T {
 	return set
 }
 
-// FilenameFromUri returns the last element of an URI
+// FilenameFromURI returns the last element of an URI
 // If the URI is empty, FilenameFromUri returns "/".
-func FilenameFromUri(uri string) string {
+func FilenameFromURI(uri string) string {
 	file := "/"
 
 	if len(uri) == 0 || uri[len(uri)-1:] == "/" {
@@ -85,9 +85,9 @@ func FilenameFromUri(uri string) string {
 	return file
 }
 
-// FilepathFromUri returns all but the last element of an URI
-// If the URI is empty, FilepathFromUri returns "/".
-func FilepathFromUri(uri string) string {
+// FilepathFromURI returns all but the last element of an URI
+// If the URI is empty, FilepathFromURI returns "/".
+func FilepathFromURI(uri string) string {
 	path := "/"
 
 	if len(uri) == 0 {
@@ -104,8 +104,8 @@ func FilepathFromUri(uri string) string {
 	return path
 }
 
-// RouteFromUri returns the element before the second "/".
-func RouteFromUri(uri string) string {
+// RouteFromURI returns the element before the second "/".
+func RouteFromURI(uri string) string {
 	route := "/"
 
 	path := strings.Split(uri, "/")
