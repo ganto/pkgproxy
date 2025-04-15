@@ -22,7 +22,7 @@ jobs:
           check-latest: true
 
       - name: Prepare Ko
-        uses: imjasonh/setup-ko@v0.8
+        uses: imjasonh/setup-ko@v0.9
 
       - name: Build and publish container image
         run: KO_DATA_DATE_EPOCH=$(git log -1 --format='%ct') ko build --bare
