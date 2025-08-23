@@ -11,6 +11,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
 
     steps:
       - name: Checkout repository
@@ -21,8 +22,15 @@ jobs:
         with:
           check-latest: true
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.9.2
+
       - name: Prepare Ko
         uses: ko-build/setup-ko@v0.9
 
       - name: Build and publish container image
-        run: KO_DATA_DATE_EPOCH=$(git log -1 --format='%ct') ko build --bare
+        run: |
+          KO_DATA_DATE_EPOCH=$(git log -1 --format='%ct')
+          export KO_DATA_DATE_EPOCH
+          IMAGE="$(ko build --bare)"
+          cosign sign --yes "${IMAGE}"
