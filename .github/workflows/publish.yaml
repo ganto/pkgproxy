@@ -23,7 +23,7 @@ jobs:
           check-latest: true
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.9.2
+        uses: sigstore/cosign-installer@v3.10.0
 
       - name: Prepare Ko
         uses: ko-build/setup-ko@v0.9
