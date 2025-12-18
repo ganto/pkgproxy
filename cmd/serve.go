@@ -40,7 +40,7 @@ func startServer(_ *cobra.Command, _ []string) error {
 	app := echo.New()
 	app.HideBanner = true
 
-	app.Use(middleware.Logger())
+	app.Use(middleware.RequestLogger())
 	app.Use(middleware.Recover())
 	if enableDebug {
 		app.Logger.SetLevel(log.DEBUG)
