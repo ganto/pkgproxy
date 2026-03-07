@@ -112,20 +112,33 @@ func (c *cache) SaveToDisk(uri string, buffer *bytes.Buffer, fileTime time.Time)
 	}
 
 	fmt.Printf("<== writing file '%s': ", filePath)
-	cacheFile, err := os.Create(filePath)
+	tmpFile, err := os.CreateTemp(path.Dir(filePath), "*.tmp")
 	if err != nil {
 		return err
 	}
-	defer cacheFile.Close()
+	tmpPath := tmpFile.Name()
 
-	size, err := cacheFile.ReadFrom(buffer)
+	size, err := tmpFile.ReadFrom(buffer)
+	closeErr := tmpFile.Close()
 	if err != nil {
+		_ = os.Remove(tmpPath)
 		return err
+	}
+	if closeErr != nil {
+		_ = os.Remove(tmpPath)
+		return closeErr
 	}
 	fmt.Printf("%d bytes written\n", size)
 
 	// set modified time to given timestamp
-	if err := os.Chtimes(filePath, time.Now().Local(), fileTime); err != nil {
+	if err := os.Chtimes(tmpPath, time.Now().Local(), fileTime); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+
+	// atomically move into place so IsCached never observes a partial file
+	if err := os.Rename(tmpPath, filePath); err != nil {
+		_ = os.Remove(tmpPath)
 		return err
 	}
 
