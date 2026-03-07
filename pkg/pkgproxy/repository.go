@@ -12,6 +12,9 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
+// repoHandleRegexp defines which repository names are accepted
+var repoHandleRegexp = regexp.MustCompile("^[a-zA-Z0-9_~.-]*$")
+
 // RepoConfig defines the upstream package repositories
 type RepoConfig struct {
 	Repositories map[string]Repository `yaml:"repositories"`
@@ -49,7 +52,7 @@ func validateConfig(config *RepoConfig) error {
 		return errors.New("missing required key 'repositories'")
 	}
 	for handle, repoConfig := range config.Repositories {
-		if alphanum := regexp.MustCompile("^[a-zA-Z0-9_~.-]*$").MatchString(handle); !alphanum {
+		if alphanum := repoHandleRegexp.MatchString(handle); !alphanum {
 			return fmt.Errorf("invalid repository name '%s'. Must be alphanumeric or in '-', '_', '.', '~'", handle)
 		}
 		if repoConfig.CacheSuffixes == nil {
