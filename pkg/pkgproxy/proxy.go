@@ -4,8 +4,10 @@ package pkgproxy
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
@@ -147,7 +149,7 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 				if repoCache.IsCached(uri) {
 					// serve or delete from cache
 					if c.Request().Method == "DELETE" {
-						fmt.Printf("--> DELETE %s\n", uri)
+						slog.Info("cache delete", "request_id", requestID(c), "uri", uri)
 						if err := repoCache.DeleteFile(uri); err != nil {
 							return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
 						}
@@ -186,7 +188,7 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 				// save buffer to disk
 				if err := repoCache.SaveToDisk(uri, rspBody, timestamp); err != nil {
 					// don't fail request if we cannot write to cache
-					fmt.Printf("Error: %s", err.Error())
+					slog.Error("cache write failed", "request_id", requestID(c), "uri", uri, "error", err)
 				}
 			}
 		}
@@ -240,14 +242,14 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 			mirrorPath := mirror.Path
 			upstreamPath := path.Join(mirrorPath, strings.TrimPrefix(clientReq.URL.Path, "/"+repo))
 
-			rsp, err = pp.forwardClientRequestToOrigin(clientReq, &url.URL{
+			rsp, err = pp.forwardClientRequestToOrigin(c.Request().Context(), requestID(c), clientReq, &url.URL{
 				Scheme: mirror.Scheme,
 				Host:   mirror.Host,
 				Path:   upstreamPath,
 			}, reqBody)
 
 			if err == nil {
-				fmt.Printf("<-- %v %+v\n", rsp.Status, rsp.Header)
+				slog.Info("upstream response", "request_id", requestID(c), "status", rsp.Status, "headers", rsp.Header)
 
 				// follow HTTP redirects
 				if utils.Contains(redirectStatusCodes, rsp.StatusCode) {
@@ -256,10 +258,10 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 					_ = rsp.Body.Close()
 					rsp = nil
 					if err == nil {
-						rsp, err = pp.forwardClientRequestToOrigin(clientReq, location, reqBody)
+						rsp, err = pp.forwardClientRequestToOrigin(c.Request().Context(), requestID(c), clientReq, location, reqBody)
 						if err == nil {
 							defer rsp.Body.Close() //nolint:gocritic // at most one redirect per mirror; not a loop accumulation
-							fmt.Printf("<-- %v %+v\n", rsp.Status, rsp.Header)
+							slog.Info("upstream response", "request_id", requestID(c), "status", rsp.Status, "headers", rsp.Header)
 						}
 					}
 				}
@@ -268,7 +270,7 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 				}
 			}
 			if err != nil {
-				fmt.Printf("<-- Error: %s\n", err.Error())
+				slog.Warn("upstream request failed", "request_id", requestID(c), "mirror_index", index, "error", err)
 			}
 
 			index += 1
@@ -302,7 +304,7 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
-func (pp *pkgProxy) forwardClientRequestToOrigin(req *http.Request, origin *url.URL, bodyBytes []byte) (*http.Response, error) {
+func (pp *pkgProxy) forwardClientRequestToOrigin(ctx context.Context, rid string, req *http.Request, origin *url.URL, bodyBytes []byte) (*http.Response, error) {
 	// Construct filtered header to send to origin server
 	headers := http.Header{}
 	for _, name := range allowedRequestHeaders {
@@ -311,16 +313,22 @@ func (pp *pkgProxy) forwardClientRequestToOrigin(req *http.Request, origin *url.
 		}
 	}
 
-	fmt.Printf("--> %v %v\n", req.Method, origin)
+	slog.InfoContext(ctx, "upstream request", "request_id", rid, "method", req.Method, "origin", origin)
 	// Construct request to send to origin server
-	return pp.transport.RoundTrip(&http.Request{
+	upstreamReq := (&http.Request{
 		Body:          io.NopCloser(bytes.NewReader(bodyBytes)),
 		Close:         req.Close,
 		ContentLength: req.ContentLength,
 		Header:        headers,
 		Method:        req.Method,
 		URL:           origin,
-	})
+	}).WithContext(ctx)
+	return pp.transport.RoundTrip(upstreamReq)
+}
+
+// Return the X-Request-ID header value from the echo context
+func requestID(c echo.Context) string {
+	return c.Response().Header().Get(echo.HeaderXRequestID)
 }
 
 // Check if the request should be handled by PkgProxy
