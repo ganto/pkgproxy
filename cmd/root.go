@@ -3,7 +3,6 @@
 package cmd
 
 import (
-	"fmt"
 	"log/slog"
 	"os"
 
@@ -67,7 +66,6 @@ func initConfig() {
 // Execute starts the command
 func Execute() {
 	if err := NewRootCommand().Execute(); err != nil {
-		fmt.Println(err)
 		os.Exit(1)
 	}
 }
