@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/ganto/pkgproxy/pkg/pkgproxy"
@@ -58,7 +59,7 @@ func initConfig() {
 	}
 
 	if err := pkgproxy.LoadConfig(&repoConfig, configPath); err != nil {
-		fmt.Printf("unable to load configuration '%s': %s\n", configPath, err.Error())
+		slog.Error("unable to load configuration", "path", configPath, "error", err)
 		os.Exit(1)
 	}
 }
