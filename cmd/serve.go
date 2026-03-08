@@ -3,8 +3,10 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"time"
 
@@ -86,10 +88,10 @@ func startServer(_ *cobra.Command, _ []string) error {
 	app.Use(pkgProxy.Cache)
 	app.Use(pkgProxy.ForwardProxy)
 
-	if err := app.Start(fmt.Sprintf("%s:%d", listenAddress, listenPort)); err != nil {
-		slog.Error("server error", "error", err)
-		os.Exit(1)
+	err := app.Start(fmt.Sprintf("%s:%d", listenAddress, listenPort))
+	// ignore normal shutdown returning http.ErrServerClosed
+	if errors.Is(err, http.ErrServerClosed) {
+		err = nil
 	}
-
-	return nil
+	return err
 }
