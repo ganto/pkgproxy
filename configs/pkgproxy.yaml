@@ -34,7 +34,7 @@ repositories:
     suffixes:
       - .rpm
     mirrors:
-      - https://copr-be.cloud.fedoraproject.org/results/
+      - https://download.copr.fedorainfracloud.org/results/
   debian:
     suffixes:
       - .deb
