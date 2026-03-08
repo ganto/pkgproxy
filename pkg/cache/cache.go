@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,7 +60,7 @@ func (c *cache) DeleteFile(uri string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("<== deleting file: %s\n", p)
+	slog.Info("cache delete", "path", p)
 	return os.Remove(p)
 }
 
@@ -130,7 +131,6 @@ func (c *cache) SaveToDisk(uri string, buffer *bytes.Buffer, fileTime time.Time)
 		}
 	}
 
-	fmt.Printf("<== writing file '%s': ", filePath)
 	tmpFile, err := os.CreateTemp(filepath.Dir(filePath), "*.tmp")
 	if err != nil {
 		return err
@@ -147,7 +147,7 @@ func (c *cache) SaveToDisk(uri string, buffer *bytes.Buffer, fileTime time.Time)
 		_ = os.Remove(tmpPath)
 		return closeErr
 	}
-	fmt.Printf("%d bytes written\n", size)
+	slog.Info("cache write", "path", filePath, "bytes", size)
 
 	// set modified time to given timestamp
 	if err := os.Chtimes(tmpPath, time.Now().Local(), fileTime); err != nil {
