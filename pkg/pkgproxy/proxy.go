@@ -208,11 +208,29 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 		var rsp *http.Response
 		var err error
 
+		// Buffer the request body once so it can be replayed across mirror retries and redirects.
+		var reqBody []byte
+		if clientReq.Body != nil {
+			reqBody, err = io.ReadAll(clientReq.Body)
+			_ = clientReq.Body.Close()
+			if err != nil {
+				httpError := echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("failed to read request body: %v", err))
+				httpError.Internal = err
+				return httpError
+			}
+		}
+
 		repo := getRepoFromURI(clientReq.RequestURI)
 		success := false
 		index := 0
 
 		for !success && index < len(pp.upstreams[repo].mirrors) {
+			// Close response from previous failed iteration before trying next mirror.
+			if rsp != nil {
+				_ = rsp.Body.Close()
+				rsp = nil
+			}
+
 			// construct new path from upstream mirror and request URI stripped by the repo prefix
 			mirror := pp.upstreams[repo].mirrors[index]
 			mirrorPath := mirror.Path
@@ -222,31 +240,37 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 				Scheme: mirror.Scheme,
 				Host:   mirror.Host,
 				Path:   upstreamPath,
-			})
+			}, reqBody)
 
 			if err == nil {
-				defer rsp.Body.Close()
 				fmt.Printf("<-- %v %+v\n", rsp.Status, rsp.Header)
 
 				// follow HTTP redirects
 				if utils.Contains(redirectStatusCodes, rsp.StatusCode) {
 					var location *url.URL
 					location, err = rsp.Location()
+					_ = rsp.Body.Close()
+					rsp = nil
 					if err == nil {
-						rsp, err = pp.forwardClientRequestToOrigin(clientReq, location)
+						rsp, err = pp.forwardClientRequestToOrigin(clientReq, location, reqBody)
 						if err == nil {
-							defer rsp.Body.Close()
+							defer rsp.Body.Close() //nolint:gocritic // at most one redirect per mirror; not a loop accumulation
 							fmt.Printf("<-- %v %+v\n", rsp.Status, rsp.Header)
 						}
 					}
 				}
-				success = rsp.StatusCode == 200
+				if err == nil {
+					success = rsp.StatusCode == 200
+				}
 			}
 			if err != nil {
 				fmt.Printf("<-- Error: %s\n", err.Error())
 			}
 
 			index += 1
+		}
+		if rsp != nil {
+			defer rsp.Body.Close()
 		}
 
 		if err != nil {
@@ -274,7 +298,7 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
-func (pp *pkgProxy) forwardClientRequestToOrigin(req *http.Request, origin *url.URL) (*http.Response, error) {
+func (pp *pkgProxy) forwardClientRequestToOrigin(req *http.Request, origin *url.URL, bodyBytes []byte) (*http.Response, error) {
 	// Construct filtered header to send to origin server
 	headers := http.Header{}
 	for _, name := range allowedRequestHeaders {
@@ -286,7 +310,7 @@ func (pp *pkgProxy) forwardClientRequestToOrigin(req *http.Request, origin *url.
 	fmt.Printf("--> %v %v\n", req.Method, origin)
 	// Construct request to send to origin server
 	return pp.transport.RoundTrip(&http.Request{
-		Body:          req.Body,
+		Body:          io.NopCloser(bytes.NewReader(bodyBytes)),
 		Close:         req.Close,
 		ContentLength: req.ContentLength,
 		Header:        headers,
