@@ -153,7 +153,11 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 						}
 						return c.JSON(http.StatusOK, map[string]string{"message": "Success"})
 					}
-					return c.File(repoCache.GetFilePath(uri))
+					filePath, err := repoCache.GetFilePath(uri)
+					if err != nil {
+						return c.JSON(http.StatusForbidden, map[string]string{"message": "Forbidden"})
+					}
+					return c.File(filePath)
 				} else {
 					if c.Request().Method == "DELETE" {
 						return c.JSON(http.StatusNotFound, map[string]string{"message": "Not Found"})
