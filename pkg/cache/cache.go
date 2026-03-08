@@ -1,4 +1,4 @@
-// Copyright 2022 Reto Gantenbein
+// Copyright 2022-2026 Reto Gantenbein
 // SPDX-License-Identifier: Apache-2.0
 package cache
 
@@ -68,12 +68,14 @@ func (c *cache) getBasePath() string {
 	return c.config.BasePath
 }
 
-// resolvedFilePath returns the absolute filesystem path for the given URI,
+// resolvedFilePath returns the filesystem path for the given URI,
 // verifying it remains within the cache base directory.
 func (c *cache) resolvedFilePath(uri string) (string, error) {
 	base := filepath.Clean(c.getBasePath())
-	p := filepath.Clean(filepath.Join(base, uri))
-	if !strings.HasPrefix(p, base+string(filepath.Separator)) {
+	// Trim any leading separators so filepath.Join always treats uri as relative to base.
+	p := filepath.Clean(filepath.Join(base, strings.TrimLeft(uri, "/")))
+	rel, err := filepath.Rel(base, p)
+	if err != nil || strings.HasPrefix(rel, "..") {
 		return "", fmt.Errorf("URI %q resolves outside the cache directory", uri)
 	}
 	return p, nil
