@@ -225,6 +225,12 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 		index := 0
 
 		for !success && index < len(pp.upstreams[repo].mirrors) {
+			// Close response from previous failed iteration before trying next mirror.
+			if rsp != nil {
+				_ = rsp.Body.Close()
+				rsp = nil
+			}
+
 			// construct new path from upstream mirror and request URI stripped by the repo prefix
 			mirror := pp.upstreams[repo].mirrors[index]
 			mirrorPath := mirror.Path
@@ -237,28 +243,34 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 			}, reqBody)
 
 			if err == nil {
-				defer rsp.Body.Close()
 				fmt.Printf("<-- %v %+v\n", rsp.Status, rsp.Header)
 
 				// follow HTTP redirects
 				if utils.Contains(redirectStatusCodes, rsp.StatusCode) {
 					var location *url.URL
 					location, err = rsp.Location()
+					_ = rsp.Body.Close()
+					rsp = nil
 					if err == nil {
 						rsp, err = pp.forwardClientRequestToOrigin(clientReq, location, reqBody)
 						if err == nil {
-							defer rsp.Body.Close()
+							defer rsp.Body.Close() //nolint:gocritic // at most one redirect per mirror; not a loop accumulation
 							fmt.Printf("<-- %v %+v\n", rsp.Status, rsp.Header)
 						}
 					}
 				}
-				success = rsp.StatusCode == 200
+				if err == nil {
+					success = rsp.StatusCode == 200
+				}
 			}
 			if err != nil {
 				fmt.Printf("<-- Error: %s\n", err.Error())
 			}
 
 			index += 1
+		}
+		if rsp != nil {
+			defer rsp.Body.Close()
 		}
 
 		if err != nil {
