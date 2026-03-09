@@ -48,7 +48,7 @@ func startServer(_ *cobra.Command, _ []string) error {
 	if enableDebug {
 		logLevel = slog.LevelDebug
 	}
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
 
 	app := echo.New()
 
@@ -74,12 +74,12 @@ func startServer(_ *cobra.Command, _ []string) error {
 			} else if status >= 400 {
 				logFn = slog.Warn
 			}
-			logFn("downstream response",
+			logFn("client response",
 				"request_id", c.Response().Header().Get(echo.HeaderXRequestID),
 				"method", c.Request().Method,
 				"uri", c.Request().RequestURI,
 				"status", status,
-				"latency", time.Since(start),
+				"latency", time.Since(start).String(),
 				"remote_ip", c.RealIP(),
 			)
 			return nil
