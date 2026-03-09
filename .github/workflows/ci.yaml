@@ -20,6 +20,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
+          go-version: 'stable'
           check-latest: true
 
       - uses: pre-commit/action@v3.0.1
@@ -31,6 +32,9 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-go@v6
+        with:
+          go-version: 'stable'
+          check-latest: true
 
       - uses: golangci/golangci-lint-action@v9.2.0
         with:
@@ -44,5 +48,8 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-go@v6
+        with:
+          go-version: 'stable'
+          check-latest: true
 
       - run: make test
