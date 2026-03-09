@@ -10,7 +10,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -159,7 +161,11 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 					if err != nil {
 						return c.JSON(http.StatusForbidden, map[string]string{"message": "Forbidden"})
 					}
-					return c.File(filePath)
+					absPath, err := filepath.Abs(filePath)
+					if err != nil {
+						return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
+					}
+					return c.FileFS(strings.TrimPrefix(absPath, "/"), os.DirFS("/"))
 				} else {
 					if c.Request().Method == "DELETE" {
 						return c.JSON(http.StatusNotFound, map[string]string{"message": "Not Found"})
@@ -294,11 +300,8 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		// copy response to client
-		headers := clientRespW.Header()
-		for _, name := range allowedResponseHeaders {
-			if value, ok := rsp.Header[name]; ok {
-				headers[name] = value
-			}
+		for name, value := range filterHeaders(rsp.Header, allowedResponseHeaders) {
+			clientRespW.Header()[name] = value
 		}
 		clientRespW.WriteHeader(rsp.StatusCode)
 		bodyBytes, _ := io.ReadAll(rsp.Body)
@@ -312,13 +315,7 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func (pp *pkgProxy) forwardClientRequestToOrigin(ctx context.Context, rid string, req *http.Request, origin *url.URL, bodyBytes []byte) (*http.Response, error) {
-	// Construct filtered header to send to origin server
-	headers := http.Header{}
-	for _, name := range allowedRequestHeaders {
-		if value, ok := req.Header[name]; ok {
-			headers[name] = value
-		}
-	}
+	headers := filterHeaders(req.Header, allowedRequestHeaders)
 
 	slog.InfoContext(ctx, "upstream request", "request_id", rid, "method", req.Method, "origin", origin)
 	// Construct request to send to origin server
@@ -331,6 +328,17 @@ func (pp *pkgProxy) forwardClientRequestToOrigin(ctx context.Context, rid string
 		URL:           origin,
 	}).WithContext(ctx)
 	return pp.transport.RoundTrip(upstreamReq)
+}
+
+// filterHeaders returns a new http.Header containing only the allowed header keys from src.
+func filterHeaders(src http.Header, allowed []string) http.Header {
+	dst := http.Header{}
+	for _, name := range allowed {
+		if value, ok := src[name]; ok {
+			dst[name] = value
+		}
+	}
+	return dst
 }
 
 // Return the X-Request-ID header value from the echo context
