@@ -230,9 +230,14 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 		success := false
 		index := 0
 
-		// Use a background context for upstream requests so that a client
-		// disconnect does not abort an in-flight upstream connection.
+		// Derive an upstream context that is independent of client disconnects
+		// but preserves any existing request deadline, so upstream calls remain bounded.
 		upstreamCtx := context.Background()
+		if deadline, ok := clientReq.Context().Deadline(); ok {
+			var cancel context.CancelFunc
+			upstreamCtx, cancel = context.WithDeadline(context.Background(), deadline)
+			defer cancel()
+		}
 
 		for !success && index < len(pp.upstreams[repo].mirrors) {
 			// Close response from previous failed iteration before trying next mirror.
