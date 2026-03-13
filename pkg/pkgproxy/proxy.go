@@ -165,7 +165,7 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 					if err != nil {
 						return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
 					}
-					return c.FileFS(strings.TrimPrefix(absPath, "/"), os.DirFS("/"))
+					return c.FileFS(filepath.Base(absPath), os.DirFS(filepath.Dir(absPath)))
 				} else {
 					if c.Request().Method == "DELETE" {
 						return c.JSON(http.StatusNotFound, map[string]string{"message": "Not Found"})
