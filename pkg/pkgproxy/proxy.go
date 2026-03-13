@@ -16,7 +16,7 @@ import (
 
 	"github.com/ganto/pkgproxy/pkg/cache"
 	"github.com/ganto/pkgproxy/pkg/utils"
-	echo "github.com/labstack/echo/v4"
+	echo "github.com/labstack/echo/v5"
 )
 
 type (
@@ -132,7 +132,7 @@ func New(config *PkgProxyConfig) PkgProxy {
 // local cache and does so if possible. Otherwise it will make sure the
 // response is cached if necessary.
 func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
+	return func(c *echo.Context) error {
 		var repoCache cache.FileCache
 		var rspBody *bytes.Buffer
 
@@ -166,11 +166,13 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 					}
 					// if not in cache write response body to buffer
 					rspBody = new(bytes.Buffer)
-					bodyWriter := io.MultiWriter(c.Response().Writer, rspBody)
-					writer := &bufferWriter{
-						Writer:         bodyWriter,
-						ResponseWriter: c.Response().Writer}
-					c.Response().Writer = writer
+					if resp, _ := echo.UnwrapResponse(c.Response()); resp != nil {
+						bodyWriter := io.MultiWriter(resp.ResponseWriter, rspBody)
+						writer := &bufferWriter{
+							Writer:         bodyWriter,
+							ResponseWriter: resp.ResponseWriter}
+						resp.ResponseWriter = writer
+					}
 				}
 			}
 		}
@@ -180,7 +182,8 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		if pp.isRepositoryRequest(uri) {
-			if repoCache.IsCacheCandidate(uri) && !repoCache.IsCached(uri) && (c.Response().Status == 200) && len(rspBody.Bytes()) > 0 {
+			resp, _ := echo.UnwrapResponse(c.Response())
+			if repoCache.IsCacheCandidate(uri) && !repoCache.IsCached(uri) && resp != nil && (resp.Status == 200) && len(rspBody.Bytes()) > 0 {
 				timestamp := time.Now().Local()
 				if c.Response().Header().Get("Last-Modified") != "" {
 					timestamp, _ = http.ParseTime(c.Response().Header().Get("Last-Modified"))
@@ -199,9 +202,9 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 
 // Proxy request to upstream
 func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
+	return func(c *echo.Context) error {
 		clientReq := c.Request()
-		clientResp := c.Response()
+		clientRespW := c.Response()
 
 		if !pp.isRepositoryRequest(clientReq.RequestURI) {
 			return next(c)
@@ -220,9 +223,7 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 			reqBody, err = io.ReadAll(clientReq.Body)
 			_ = clientReq.Body.Close()
 			if err != nil {
-				httpError := echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("failed to read request body: %v", err))
-				httpError.Internal = err
-				return httpError
+				return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("failed to read request body: %v", err)).Wrap(err)
 			}
 		}
 
@@ -289,24 +290,21 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		if err != nil {
-			httpError := echo.NewHTTPError(http.StatusBadGateway, fmt.Sprintf("request to upstream server failed: %v", err))
-			httpError.Internal = err
-			return httpError
+			return echo.NewHTTPError(http.StatusBadGateway, fmt.Sprintf("request to upstream server failed: %v", err)).Wrap(err)
 		}
 
 		// copy response to client
-		headers := clientResp.Header()
+		headers := clientRespW.Header()
 		for _, name := range allowedResponseHeaders {
 			if value, ok := rsp.Header[name]; ok {
 				headers[name] = value
 			}
 		}
-		clientResp.WriteHeader(rsp.StatusCode)
+		clientRespW.WriteHeader(rsp.StatusCode)
 		bodyBytes, _ := io.ReadAll(rsp.Body)
 		if len(bodyBytes) > 0 {
 			// ignore errors, since there's nothing we can do
-			size, _ := io.CopyN(clientResp.Writer, bytes.NewReader(bodyBytes), int64(len(bodyBytes)))
-			clientResp.Size = size
+			_, _ = io.CopyN(clientRespW, bytes.NewReader(bodyBytes), int64(len(bodyBytes)))
 		}
 
 		return nil
@@ -336,7 +334,7 @@ func (pp *pkgProxy) forwardClientRequestToOrigin(ctx context.Context, rid string
 }
 
 // Return the X-Request-ID header value from the echo context
-func requestID(c echo.Context) string {
+func requestID(c *echo.Context) string {
 	return c.Response().Header().Get(echo.HeaderXRequestID)
 }
 

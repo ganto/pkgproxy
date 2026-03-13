@@ -3,16 +3,17 @@
 package cmd
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/ganto/pkgproxy/pkg/pkgproxy"
-	echo "github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	echo "github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 	"github.com/spf13/cobra"
 )
 
@@ -48,20 +49,23 @@ func startServer(_ *cobra.Command, _ []string) error {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
 
 	app := echo.New()
-	app.HideBanner = true
 
 	app.Use(middleware.RequestID())
 	app.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			start := time.Now()
 			err := next(c)
 			// Let Echo handle the error to ensure the status is set properly.
 			// However this will prevent any potential upstream middleware from
 			// receiving the error.
 			if err != nil {
-				c.Error(err)
+				app.HTTPErrorHandler(c, err)
 			}
-			status := c.Response().Status
+			resp, _ := echo.UnwrapResponse(c.Response())
+			status := 0
+			if resp != nil {
+				status = resp.Status
+			}
 			logFn := slog.Info
 			if status >= 500 {
 				logFn = slog.Error
@@ -88,10 +92,12 @@ func startServer(_ *cobra.Command, _ []string) error {
 	app.Use(pkgProxy.Cache)
 	app.Use(pkgProxy.ForwardProxy)
 
-	err := app.Start(fmt.Sprintf("%s:%d", listenAddress, listenPort))
-	// ignore normal shutdown returning http.ErrServerClosed
-	if errors.Is(err, http.ErrServerClosed) {
-		err = nil
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	sc := echo.StartConfig{
+		Address:    fmt.Sprintf("%s:%d", listenAddress, listenPort),
+		HideBanner: true,
 	}
-	return err
+	return sc.Start(ctx, app)
 }
