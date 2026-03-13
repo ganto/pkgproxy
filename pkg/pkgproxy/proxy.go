@@ -230,6 +230,10 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 		success := false
 		index := 0
 
+		// Use a background context for upstream requests so that a client
+		// disconnect does not abort an in-flight upstream connection.
+		upstreamCtx := context.Background()
+
 		for !success && index < len(pp.upstreams[repo].mirrors) {
 			// Close response from previous failed iteration before trying next mirror.
 			if rsp != nil {
@@ -242,7 +246,7 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 			mirrorPath := mirror.Path
 			upstreamPath := path.Join(mirrorPath, strings.TrimPrefix(clientReq.URL.Path, "/"+repo))
 
-			rsp, err = pp.forwardClientRequestToOrigin(c.Request().Context(), requestID(c), clientReq, &url.URL{
+			rsp, err = pp.forwardClientRequestToOrigin(upstreamCtx, requestID(c), clientReq, &url.URL{
 				Scheme: mirror.Scheme,
 				Host:   mirror.Host,
 				Path:   upstreamPath,
@@ -258,7 +262,7 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 					_ = rsp.Body.Close()
 					rsp = nil
 					if err == nil {
-						rsp, err = pp.forwardClientRequestToOrigin(c.Request().Context(), requestID(c), clientReq, location, reqBody)
+						rsp, err = pp.forwardClientRequestToOrigin(upstreamCtx, requestID(c), clientReq, location, reqBody)
 						if err == nil {
 							defer rsp.Body.Close() //nolint:gocritic // at most one redirect per mirror; not a loop accumulation
 							slog.Info("upstream response", "request_id", requestID(c), "status", rsp.Status, "headers", rsp.Header)
