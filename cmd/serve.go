@@ -4,10 +4,8 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -101,10 +99,5 @@ func startServer(_ *cobra.Command, _ []string) error {
 		Address:    fmt.Sprintf("%s:%d", listenAddress, listenPort),
 		HideBanner: true,
 	}
-	err := sc.Start(ctx, app)
-	// ignore normal shutdown returning http.ErrServerClosed
-	if errors.Is(err, http.ErrServerClosed) {
-		err = nil
-	}
-	return err
+	return sc.Start(ctx, app)
 }

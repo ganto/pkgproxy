@@ -166,12 +166,13 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 					}
 					// if not in cache write response body to buffer
 					rspBody = new(bytes.Buffer)
-					resp, _ := echo.UnwrapResponse(c.Response())
-					bodyWriter := io.MultiWriter(resp.ResponseWriter, rspBody)
-					writer := &bufferWriter{
-						Writer:         bodyWriter,
-						ResponseWriter: resp.ResponseWriter}
-					resp.ResponseWriter = writer
+					if resp, _ := echo.UnwrapResponse(c.Response()); resp != nil {
+						bodyWriter := io.MultiWriter(resp.ResponseWriter, rspBody)
+						writer := &bufferWriter{
+							Writer:         bodyWriter,
+							ResponseWriter: resp.ResponseWriter}
+						resp.ResponseWriter = writer
+					}
 				}
 			}
 		}
