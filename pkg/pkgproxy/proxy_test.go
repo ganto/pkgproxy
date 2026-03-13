@@ -5,6 +5,7 @@ package pkgproxy
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -386,8 +387,13 @@ func TestForwardProxyAllMirrorsFail(t *testing.T) {
 }
 
 func TestForwardProxyConnectionFail(t *testing.T) {
-	// Mirror at a port nothing listens on
-	pp, _ := newTestProxy(t, []string{"http://127.0.0.1:1/"})
+	// Bind to a free port then immediately close it so nothing is listening.
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	addr := l.Addr().String()
+	l.Close()
+
+	pp, _ := newTestProxy(t, []string{"http://" + addr + "/"})
 	app := newTestApp(pp)
 
 	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/file.rpm", nil)
