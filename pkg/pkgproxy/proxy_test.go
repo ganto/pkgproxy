@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	echo "github.com/labstack/echo/v5"
@@ -52,6 +53,8 @@ func newTestApp(pp PkgProxy) *echo.Echo {
 		}
 	})
 	app.Use(middleware.Recover())
+	app.Use(pp.Browse)
+	app.Use(pp.LandingPage)
 	app.Use(pp.Cache)
 	app.Use(pp.ForwardProxy)
 	return app
@@ -100,9 +103,9 @@ func TestIsRepositoryRequest(t *testing.T) {
 
 func TestFilterHeaders(t *testing.T) {
 	src := http.Header{
-		"Accept":       {"text/html"},
-		"User-Agent":   {"test-agent"},
-		"X-Custom-Foo": {"should-be-stripped"},
+		"Accept":        {"text/html"},
+		"User-Agent":    {"test-agent"},
+		"X-Custom-Foo":  {"should-be-stripped"},
 		"Authorization": {"Bearer token"},
 	}
 	allowed := []string{"Accept", "User-Agent", "Authorization"}
@@ -122,6 +125,308 @@ func TestFilterHeadersEmpty(t *testing.T) {
 
 	result = filterHeaders(http.Header{"Accept": {"text/html"}}, []string{})
 	assert.Empty(t, result)
+}
+
+func TestIsLandingPageRequest(t *testing.T) {
+	tests := []struct {
+		uri  string
+		want bool
+	}{
+		{"/testrepo", true},
+		{"/testrepo/", true},
+		{"/testrepo/?foo=bar", true},
+		{"/testrepo/some/file.rpm", false},
+		{"/", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.uri, func(t *testing.T) {
+			assert.Equal(t, tt.want, isLandingPageRequest(tt.uri))
+		})
+	}
+}
+
+// --- LandingPage middleware tests ---
+
+func TestLandingPageJSON(t *testing.T) {
+	pp, _ := newTestProxy(t, []string{"http://mirror1.example.com/", "http://mirror2.example.com/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/", nil)
+	req.Header.Set("Accept", "application/json")
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "testrepo", body["name"])
+
+	mirrors, ok := body["mirrors"].([]any)
+	require.True(t, ok)
+	assert.Len(t, mirrors, 2)
+	assert.Equal(t, "http://mirror1.example.com/", mirrors[0])
+
+	suffixes, ok := body["suffixes"].([]any)
+	require.True(t, ok)
+	assert.Equal(t, []any{".rpm"}, suffixes)
+}
+
+func TestLandingPageJSONNoTrailingSlash(t *testing.T) {
+	pp, _ := newTestProxy(t, []string{"http://mirror.example.com/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo", nil)
+	req.Header.Set("Accept", "application/json")
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "testrepo", body["name"])
+}
+
+func TestLandingPageHTML(t *testing.T) {
+	pp, _ := newTestProxy(t, []string{"http://mirror.example.com/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/", nil)
+	req.Header.Set("Accept", "text/html")
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+	assert.Contains(t, body, "<title>pkgproxy: testrepo</title>")
+	assert.Contains(t, body, `href="http://mirror.example.com/"`)
+	assert.Contains(t, body, ".rpm")
+}
+
+func TestLandingPageHTMLDefaultAccept(t *testing.T) {
+	// No Accept header or wildcard Accept should return HTML
+	pp, _ := newTestProxy(t, []string{"http://mirror.example.com/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.True(t, strings.HasPrefix(rec.Body.String(), "<!DOCTYPE html>"))
+}
+
+func TestLandingPageNotForSubPath(t *testing.T) {
+	// Requests to sub-paths should pass through to Cache/ForwardProxy, not landing page
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "upstream-content")
+	}))
+	defer upstream.Close()
+
+	pp, _ := newTestProxy(t, []string{upstream.URL + "/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/sub/dir/file.rpm", nil)
+	req.Header.Set("Accept", "application/json")
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	// Should NOT return landing page JSON — should proxy to upstream
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "upstream-content", rec.Body.String())
+}
+
+// --- Browse middleware tests ---
+
+func TestBrowseEmptyCache(t *testing.T) {
+	pp, _ := newTestProxy(t, []string{"http://mirror.example.com/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/?browse", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+	assert.Contains(t, body, "No cached files.")
+	assert.Contains(t, body, "testrepo")
+}
+
+func TestBrowseWithCachedFiles(t *testing.T) {
+	pp, cacheDir := newTestProxy(t, []string{"http://mirror.example.com/"})
+
+	// Pre-populate cache
+	pkg1 := filepath.Join(cacheDir, "testrepo", "Packages", "x86_64", "foo.rpm")
+	pkg2 := filepath.Join(cacheDir, "testrepo", "Packages", "x86_64", "bar.rpm")
+	require.NoError(t, os.MkdirAll(filepath.Dir(pkg1), 0o750))
+	require.NoError(t, os.WriteFile(pkg1, []byte("foo-content"), 0o644))
+	require.NoError(t, os.WriteFile(pkg2, []byte("bar-content-longer"), 0o644))
+
+	app := newTestApp(pp)
+
+	// Browse repo root — should show Packages dir
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/?browse", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+	assert.Contains(t, body, "Packages/")
+	assert.Contains(t, body, "?browse")
+	// Packages dir has 2 files
+	assert.Contains(t, body, "2")
+}
+
+func TestBrowseSubDirectory(t *testing.T) {
+	pp, cacheDir := newTestProxy(t, []string{"http://mirror.example.com/"})
+
+	pkgPath := filepath.Join(cacheDir, "testrepo", "Packages", "foo.rpm")
+	require.NoError(t, os.MkdirAll(filepath.Dir(pkgPath), 0o750))
+	require.NoError(t, os.WriteFile(pkgPath, []byte("content"), 0o644))
+
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/Packages/?browse", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+	// File entry with download link (no ?browse)
+	assert.Contains(t, body, `href="/testrepo/Packages/foo.rpm"`)
+	// Parent link
+	assert.Contains(t, body, `/testrepo/?browse`)
+}
+
+func TestBrowseFileRedirectsToDownload(t *testing.T) {
+	pp, cacheDir := newTestProxy(t, []string{"http://mirror.example.com/"})
+
+	pkgPath := filepath.Join(cacheDir, "testrepo", "foo.rpm")
+	require.NoError(t, os.MkdirAll(filepath.Dir(pkgPath), 0o750))
+	require.NoError(t, os.WriteFile(pkgPath, []byte("content"), 0o644))
+
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/foo.rpm?browse", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "/testrepo/foo.rpm", rec.Header().Get("Location"))
+}
+
+func TestBrowseNonRepoPassthrough(t *testing.T) {
+	pp, _ := newTestProxy(t, []string{"http://mirror.example.com/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/notarepo/?browse", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	// Not a known repo — passes through to 404
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestBrowseBreadcrumbs(t *testing.T) {
+	pp, cacheDir := newTestProxy(t, []string{"http://mirror.example.com/"})
+
+	subdir := filepath.Join(cacheDir, "testrepo", "Packages", "x86_64")
+	require.NoError(t, os.MkdirAll(subdir, 0o750))
+
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/Packages/x86_64/?browse", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+	assert.Contains(t, body, `/testrepo/?browse`)
+	assert.Contains(t, body, `/testrepo/Packages/?browse`)
+	assert.Contains(t, body, `x86_64`)
+}
+
+func TestComputeDirStats(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "a.rpm"), []byte("aaaa"), 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "sub"), 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "sub", "b.rpm"), []byte("bb"), 0o644))
+
+	s, err := computeDirStats(dir)
+	require.NoError(t, err)
+	assert.Equal(t, 2, s.fileCount)
+	assert.Equal(t, int64(6), s.totalSize)
+}
+
+func TestComputeDirStatsNonExistent(t *testing.T) {
+	s, err := computeDirStats("/nonexistent/path/that/does/not/exist")
+	assert.NoError(t, err)
+	assert.Equal(t, 0, s.fileCount)
+	assert.Equal(t, int64(0), s.totalSize)
+}
+
+func TestFormatSize(t *testing.T) {
+	tests := []struct {
+		input int64
+		want  string
+	}{
+		{0, "0 B"},
+		{512, "512 B"},
+		{1023, "1023 B"},
+		{1024, "1.0 KiB"},
+		{1536, "1.5 KiB"},
+		{1024 * 1024, "1.0 MiB"},
+		{int64(1.5 * 1024 * 1024), "1.5 MiB"},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, formatSize(tt.input), "formatSize(%d)", tt.input)
+	}
+}
+
+func TestLandingPageCacheStats(t *testing.T) {
+	pp, cacheDir := newTestProxy(t, []string{"http://mirror.example.com/"})
+
+	// Pre-populate two cached files
+	for _, name := range []string{"foo.rpm", "bar.rpm"} {
+		p := filepath.Join(cacheDir, "testrepo", name)
+		require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o750))
+		require.NoError(t, os.WriteFile(p, []byte("content"), 0o644))
+	}
+
+	app := newTestApp(pp)
+
+	// HTML response includes stats
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "2 files")
+	assert.Contains(t, rec.Body.String(), "?browse")
+}
+
+func TestLandingPageCacheStatsJSON(t *testing.T) {
+	pp, cacheDir := newTestProxy(t, []string{"http://mirror.example.com/"})
+
+	p := filepath.Join(cacheDir, "testrepo", "foo.rpm")
+	require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o750))
+	require.NoError(t, os.WriteFile(p, []byte("content"), 0o644))
+
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/", nil)
+	req.Header.Set("Accept", "application/json")
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, float64(1), body["cache_files"])
+	assert.Equal(t, float64(7), body["cache_size_bytes"]) // len("content")
 }
 
 // --- New() constructor tests ---
