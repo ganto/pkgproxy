@@ -89,6 +89,8 @@ func startServer(_ *cobra.Command, _ []string) error {
 		CacheBasePath:    cacheDir,
 		RepositoryConfig: &repoConfig,
 	})
+	app.Use(pkgProxy.Browse)
+	app.Use(pkgProxy.LandingPage)
 	app.Use(pkgProxy.Cache)
 	app.Use(pkgProxy.ForwardProxy)
 

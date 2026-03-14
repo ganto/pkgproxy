@@ -23,8 +23,10 @@ import (
 
 type (
 	PkgProxy interface {
+		Browse(echo.HandlerFunc) echo.HandlerFunc
 		Cache(echo.HandlerFunc) echo.HandlerFunc
 		ForwardProxy(echo.HandlerFunc) echo.HandlerFunc
+		LandingPage(echo.HandlerFunc) echo.HandlerFunc
 	}
 
 	PkgProxyConfig struct {
@@ -37,8 +39,9 @@ type (
 	}
 
 	pkgProxy struct {
-		transport http.RoundTripper
-		upstreams map[string]upstream
+		transport  http.RoundTripper
+		repoConfig *RepoConfig
+		upstreams  map[string]upstream
 	}
 	upstream struct {
 		cache   cache.FileCache
@@ -125,8 +128,9 @@ func New(config *PkgProxyConfig) PkgProxy {
 		}
 	}
 	return &pkgProxy{
-		transport: transport,
-		upstreams: upstreams,
+		transport:  transport,
+		repoConfig: config.RepositoryConfig,
+		upstreams:  upstreams,
 	}
 }
 
