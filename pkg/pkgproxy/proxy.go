@@ -249,6 +249,9 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadGateway, fmt.Sprintf("request to upstream server failed: %v", err)).Wrap(err)
 		}
+		if rsp == nil {
+			return echo.NewHTTPError(http.StatusBadGateway, "no mirror returned a response")
+		}
 
 		// copy response to client
 		for name, value := range filterHeaders(rsp.Header, allowedResponseHeaders) {

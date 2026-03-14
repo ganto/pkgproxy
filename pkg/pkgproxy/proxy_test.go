@@ -403,6 +403,18 @@ func TestForwardProxyConnectionFail(t *testing.T) {
 	assert.Equal(t, http.StatusBadGateway, rec.Code)
 }
 
+func TestForwardProxyNoMirrors(t *testing.T) {
+	// A repo with no mirrors should return 502 Bad Gateway instead of panicking
+	pp, _ := newTestProxy(t, []string{})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/file.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+}
+
 func TestForwardProxyRedirect(t *testing.T) {
 	// Final destination returns 200
 	destination := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
