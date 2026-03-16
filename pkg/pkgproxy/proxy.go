@@ -37,12 +37,14 @@ type (
 	}
 
 	pkgProxy struct {
-		transport http.RoundTripper
-		upstreams map[string]upstream
+		transport  http.RoundTripper
+		upstreams  map[string]upstream
+		retryDelay time.Duration
 	}
 	upstream struct {
 		cache   cache.FileCache
 		mirrors []*url.URL
+		retries int
 	}
 )
 
@@ -91,6 +93,12 @@ var (
 		"Vary",
 	}
 
+	// Default number of attempts per mirror (1 = no retry)
+	defaultRetries = 1
+
+	// Delay between retry attempts for the same mirror
+	retryDelay = 1 * time.Second
+
 	// Status codes which will trigger a new request to the "Location" header
 	redirectStatusCodes = []int{
 		301,
@@ -116,17 +124,23 @@ func New(config *PkgProxyConfig) PkgProxy {
 				mirrors = append(mirrors, url)
 			}
 		}
+		retries := config.RepositoryConfig.Repositories[repo].Retries
+		if retries < 1 {
+			retries = defaultRetries
+		}
 		upstreams[repo] = upstream{
 			cache: cache.New(&cache.CacheConfig{
 				BasePath:     config.CacheBasePath,
 				FileSuffixes: config.RepositoryConfig.Repositories[repo].CacheSuffixes,
 			}),
 			mirrors: mirrors,
+			retries: retries,
 		}
 	}
 	return &pkgProxy{
-		transport: transport,
-		upstreams: upstreams,
+		transport:  transport,
+		upstreams:  upstreams,
+		retryDelay: retryDelay,
 	}
 }
 
@@ -265,53 +279,78 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 // tryMirrors iterates the mirrors for repo in order, following one redirect per mirror,
-// and returns the first 200 response. If no mirror returns 200, the last non-nil response
-// (possibly non-200) is returned with a nil error. A non-nil error is only returned when
-// the last mirror attempt failed at the connection level (e.g. DNS failure, refused
-// connection) — not when the server replied with a non-200 HTTP status.
+// and returns the first 200 response. Each mirror is attempted up to the configured
+// number of retries (useful when a redirector like download.fedoraproject.org sends
+// traffic to a broken mirror — retrying may yield a different, working mirror).
+// If no mirror returns 200, the last non-nil response (possibly non-200) is returned
+// with a nil error. A non-nil error is only returned when the last mirror attempt
+// failed at the connection level (e.g. DNS failure, refused connection) — not when
+// the server replied with a non-200 HTTP status.
 func (pp *pkgProxy) tryMirrors(ctx context.Context, rid string, req *http.Request, repo string, reqBody []byte) (*http.Response, error) {
 	var rsp *http.Response
 	var err error
 
+	retries := pp.upstreams[repo].retries
+
 	for i, mirror := range pp.upstreams[repo].mirrors {
-		// Close response from previous failed iteration before trying next mirror.
-		if rsp != nil {
-			_ = rsp.Body.Close()
-			rsp = nil
-		}
-
-		upstreamPath := path.Join(mirror.Path, strings.TrimPrefix(req.URL.Path, "/"+repo))
-		rsp, err = pp.forwardClientRequestToOrigin(ctx, rid, req, &url.URL{
-			Scheme: mirror.Scheme,
-			Host:   mirror.Host,
-			Path:   upstreamPath,
-		}, reqBody)
-		if err != nil {
-			slog.Warn("upstream request failed", "request_id", rid, "mirror_index", i, "error", err)
-			continue
-		}
-		slog.Info("upstream response", "request_id", rid, "status", rsp.Status, "headers", rsp.Header)
-
-		// Follow HTTP redirects.
-		if utils.Contains(redirectStatusCodes, rsp.StatusCode) {
-			location, locErr := rsp.Location()
-			_ = rsp.Body.Close()
-			rsp = nil
-			if locErr != nil {
-				err = locErr
-				slog.Warn("upstream request failed", "request_id", rid, "mirror_index", i, "error", err)
-				continue
+		for attempt := 1; attempt <= retries; attempt++ {
+			// Close response from previous failed attempt before retrying.
+			if rsp != nil {
+				_ = rsp.Body.Close()
+				rsp = nil
 			}
-			rsp, err = pp.forwardClientRequestToOrigin(ctx, rid, req, location, reqBody)
+
+			if attempt > 1 {
+				slog.Info("retrying mirror", "request_id", rid, "mirror_index", i, "attempt", attempt)
+				select {
+				case <-time.After(pp.retryDelay):
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+			}
+
+			upstreamPath := path.Join(mirror.Path, strings.TrimPrefix(req.URL.Path, "/"+repo))
+			rsp, err = pp.forwardClientRequestToOrigin(ctx, rid, req, &url.URL{
+				Scheme: mirror.Scheme,
+				Host:   mirror.Host,
+				Path:   upstreamPath,
+			}, reqBody)
 			if err != nil {
-				slog.Warn("upstream request failed", "request_id", rid, "mirror_index", i, "error", err)
-				continue
+				slog.Warn("upstream request failed", "request_id", rid, "mirror_index", i, "attempt", attempt, "error", err)
+				break // connection-level error, skip to next mirror
 			}
 			slog.Info("upstream response", "request_id", rid, "status", rsp.Status, "headers", rsp.Header)
-		}
 
-		if rsp.StatusCode == http.StatusOK {
-			return rsp, nil
+			// Follow HTTP redirects.
+			if utils.Contains(redirectStatusCodes, rsp.StatusCode) {
+				location, locErr := rsp.Location()
+				_ = rsp.Body.Close()
+				rsp = nil
+				if locErr != nil {
+					err = locErr
+					slog.Warn("upstream request failed", "request_id", rid, "mirror_index", i, "attempt", attempt, "error", err)
+					break // bad redirect, skip to next mirror
+				}
+				rsp, err = pp.forwardClientRequestToOrigin(ctx, rid, req, location, reqBody)
+				if err != nil {
+					slog.Warn("upstream request failed", "request_id", rid, "mirror_index", i, "attempt", attempt, "error", err)
+					break // connection-level error, skip to next mirror
+				}
+				slog.Info("upstream response", "request_id", rid, "status", rsp.Status, "headers", rsp.Header)
+			}
+
+			if rsp.StatusCode == http.StatusOK {
+				return rsp, nil
+			}
+
+			// Retry this mirror if we got a server error (5xx) and have attempts left.
+			if rsp.StatusCode >= 500 && attempt < retries {
+				slog.Warn("upstream server error, will retry", "request_id", rid, "mirror_index", i, "attempt", attempt, "status", rsp.StatusCode)
+				continue
+			}
+
+			// Non-5xx non-200 (e.g. 404): no point retrying this mirror.
+			break
 		}
 	}
 

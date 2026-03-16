@@ -65,6 +65,9 @@ repositories:
     mirrors:
       - https://mirror.init7.net/fedora/fedora/linux/
       - https://download.fedoraproject.org/pub/fedora/linux/
+    # Retry mirrors that return 5xx errors (useful for redirectors like
+    # download.fedoraproject.org that may redirect to a broken mirror)
+    retries: 3
   rockylinux:
     suffixes:
       - .drpm
