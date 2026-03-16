@@ -302,9 +302,11 @@ func (pp *pkgProxy) tryMirrors(ctx context.Context, rid string, req *http.Reques
 
 			if attempt > 1 {
 				slog.Info("retrying mirror", "request_id", rid, "mirror_index", i, "attempt", attempt)
+				timer := time.NewTimer(pp.retryDelay)
 				select {
-				case <-time.After(pp.retryDelay):
+				case <-timer.C:
 				case <-ctx.Done():
+					timer.Stop()
 					return nil, ctx.Err()
 				}
 			}
