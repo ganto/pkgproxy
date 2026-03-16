@@ -23,6 +23,7 @@ type RepoConfig struct {
 type Repository struct {
 	CacheSuffixes []string `yaml:"suffixes"`
 	Mirrors       []string `yaml:"mirrors"`
+	Retries       int      `yaml:"retries,omitempty"`
 }
 
 func LoadConfig(config *RepoConfig, path string) error {

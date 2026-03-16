@@ -38,6 +38,28 @@ func newTestProxy(t *testing.T, mirrors []string) (PkgProxy, string) {
 	return pp, cacheDir
 }
 
+// newTestProxyWithRetries creates a pkgProxy with a single "testrepo" repository using the given mirrors and retries.
+// The retry delay is set to zero for fast tests.
+func newTestProxyWithRetries(t *testing.T, mirrors []string, retries int) (PkgProxy, string) {
+	t.Helper()
+	cacheDir := t.TempDir()
+	repoConfig := &RepoConfig{
+		Repositories: map[string]Repository{
+			"testrepo": {
+				CacheSuffixes: []string{".rpm"},
+				Mirrors:       mirrors,
+				Retries:       retries,
+			},
+		},
+	}
+	pp := New(&PkgProxyConfig{
+		CacheBasePath:    cacheDir,
+		RepositoryConfig: repoConfig,
+	})
+	pp.(*pkgProxy).retryBaseDelay = 0
+	return pp, cacheDir
+}
+
 // newTestApp creates an Echo app with the standard middleware chain used in tests.
 func newTestApp(pp PkgProxy) *echo.Echo {
 	app := echo.New()
@@ -565,6 +587,25 @@ func TestForwardProxyUpstreamPath(t *testing.T) {
 	assert.Equal(t, "/basepath/sub/dir/file.rpm", receivedPath)
 }
 
+func TestForwardProxyQueryStringPreserved(t *testing.T) {
+	var receivedRawQuery string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedRawQuery = r.URL.RawQuery
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	pp, _ := newTestProxy(t, []string{upstream.URL + "/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/repodata/repomd.xml?age=300&arch=x86_64", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "age=300&arch=x86_64", receivedRawQuery)
+}
+
 // --- httpbin.org tests (gated by environment variable) ---
 
 func TestForwardProxyWithHttpbin(t *testing.T) {
@@ -676,4 +717,104 @@ func TestForwardProxyMultipleRedirectStatusCodes(t *testing.T) {
 			assert.Equal(t, "final", rec.Body.String())
 		})
 	}
+}
+
+// --- Retry tests ---
+
+func TestForwardProxyRetryAfterRedirect5xx(t *testing.T) {
+	// Simulates a redirector (like download.fedoraproject.org) that redirects to
+	// a broken mirror on the first attempt, then a working mirror on retry.
+	attempt := 0
+	goodMirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "good-mirror-body")
+	}))
+	defer goodMirror.Close()
+
+	badMirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer badMirror.Close()
+
+	// Redirector alternates between bad and good mirror
+	redirector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempt++
+		if attempt == 1 {
+			w.Header().Set("Location", badMirror.URL+r.URL.Path)
+		} else {
+			w.Header().Set("Location", goodMirror.URL+r.URL.Path)
+		}
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer redirector.Close()
+
+	pp, _ := newTestProxyWithRetries(t, []string{redirector.URL + "/"}, 3)
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/file.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "good-mirror-body", rec.Body.String())
+	assert.Equal(t, 2, attempt, "expected 2 attempts to the redirector")
+}
+
+func TestForwardProxyRetryExhausted(t *testing.T) {
+	// All retry attempts return 503 — should return the 503 to the client
+	mirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprint(w, "unavailable")
+	}))
+	defer mirror.Close()
+
+	pp, _ := newTestProxyWithRetries(t, []string{mirror.URL + "/"}, 2)
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/file.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+}
+
+func TestForwardProxyNoRetryOn404(t *testing.T) {
+	// 404 should not trigger a retry
+	requestCount := 0
+	mirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mirror.Close()
+
+	pp, _ := newTestProxyWithRetries(t, []string{mirror.URL + "/"}, 3)
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/file.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, 1, requestCount, "expected no retries for 404")
+}
+
+func TestForwardProxyDefaultRetriesIsOne(t *testing.T) {
+	// With default retries (0 in config = 1 attempt), 503 should not be retried
+	requestCount := 0
+	mirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer mirror.Close()
+
+	pp, _ := newTestProxy(t, []string{mirror.URL + "/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/file.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	assert.Equal(t, 1, requestCount, "expected only 1 attempt with default retries")
 }

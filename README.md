@@ -27,6 +27,39 @@ podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z --volume ./pkgprox
 
 An example repository configuration can be found at [configs/pkgproxy.yaml](configs/pkgproxy.yaml).
 
+Each repository supports the following options:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `suffixes` | yes | File suffixes that are eligible for caching (e.g. `.rpm`, `.deb`) |
+| `mirrors` | yes | Ordered list of upstream mirror URLs |
+| `retries` | no | Number of attempts per mirror before moving to the next one (default: `1`) |
+
+### Mirror retries
+
+Some upstream mirrors (e.g. `download.fedoraproject.org`) act as redirectors that
+send clients to a randomly selected mirror via HTTP 302. If the selected mirror is
+temporarily unavailable and responds with a 5xx error, pkgproxy can automatically
+retry the request to the same redirector, which will typically redirect to a
+different, working mirror.
+
+To enable this, set `retries` to a value greater than 1:
+
+```yaml
+repositories:
+  fedora:
+    suffixes:
+      - .rpm
+    mirrors:
+      - https://download.fedoraproject.org/pub/fedora/linux/
+    retries: 3
+```
+
+With `retries: 3`, pkgproxy will attempt each mirror up to 3 times before moving
+on to the next one. An exponential backoff is applied between retry attempts
+(1s, 2s, 4s, ...). Only 5xx (server error) responses trigger a retry — client
+errors like 404 are returned immediately.
+
 ## Client Configuration
 
 With the provided configuration a number of Linux distributions are handled. See below where and how the clients must be adjusted to use your instance of pkgproxy. Replace `<pkgproxy>` with the host name of the pkgproxy instance:
