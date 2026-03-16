@@ -161,7 +161,7 @@ For Enterprise distributions the URL suffix `epel-$releasever-$basearch` must be
 ```
 [baseos]
 # mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever$rltype
-baseurl=http://<pkgproxy>:8080/rocky/$releasever/BaseOS/$basearch/os/
+baseurl=http://<pkgproxy>:8080/rockylinux/$releasever/BaseOS/$basearch/os/
 ```
 
 ### Ubuntu
