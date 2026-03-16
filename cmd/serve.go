@@ -20,11 +20,13 @@ import (
 var (
 	listenAddress string
 	listenPort    uint16
+	publicHost    string
 )
 
 const (
-	defaultAddress = "localhost"
-	defaultPort    = 8080
+	defaultAddress   = "localhost"
+	defaultPort      = 8080
+	publicHostEnvVar = "PKGPROXY_PUBLIC_HOST"
 )
 
 func newServeCommand() *cobra.Command {
@@ -37,8 +39,22 @@ func newServeCommand() *cobra.Command {
 	}
 	c.PersistentFlags().StringVar(&listenAddress, "host", defaultAddress, "listen address of the pkgproxy.")
 	c.PersistentFlags().Uint16Var(&listenPort, "port", defaultPort, "listen port of the pkgproxy.")
+	c.PersistentFlags().StringVar(&publicHost, "public-host", "", "public hostname (or host:port) shown in landing page config snippets; overrides PKGPROXY_PUBLIC_HOST.")
 
 	return c
+}
+
+// resolvePublicAddr determines the address rendered in landing page config snippets.
+// The CLI flag takes precedence over the environment variable. If neither is set,
+// the listen host:port is used.
+func resolvePublicAddr(flagValue string, listenAddr string, port uint16) string {
+	if flagValue != "" {
+		return flagValue
+	}
+	if v := os.Getenv(publicHostEnvVar); v != "" {
+		return v
+	}
+	return fmt.Sprintf("%s:%d", listenAddr, port)
 }
 
 func startServer(_ *cobra.Command, _ []string) error {
@@ -89,6 +105,8 @@ func startServer(_ *cobra.Command, _ []string) error {
 		CacheBasePath:    cacheDir,
 		RepositoryConfig: &repoConfig,
 	})
+	publicAddr := resolvePublicAddr(publicHost, listenAddress, listenPort)
+	app.GET("/", pkgproxy.LandingHandler(&repoConfig, publicAddr))
 	app.Use(pkgProxy.Cache)
 	app.Use(pkgProxy.ForwardProxy)
 

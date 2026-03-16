@@ -122,9 +122,9 @@ func TestIsRepositoryRequest(t *testing.T) {
 
 func TestFilterHeaders(t *testing.T) {
 	src := http.Header{
-		"Accept":       {"text/html"},
-		"User-Agent":   {"test-agent"},
-		"X-Custom-Foo": {"should-be-stripped"},
+		"Accept":        {"text/html"},
+		"User-Agent":    {"test-agent"},
+		"X-Custom-Foo":  {"should-be-stripped"},
 		"Authorization": {"Bearer token"},
 	}
 	allowed := []string{"Accept", "User-Agent", "Authorization"}
