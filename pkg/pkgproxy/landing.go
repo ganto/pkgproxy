@@ -5,6 +5,7 @@ package pkgproxy
 import (
 	"html/template"
 	"net/http"
+	"sort"
 
 	echo "github.com/labstack/echo/v5"
 )
@@ -26,11 +27,11 @@ ul { padding-left: 1.4em; }
 <body>
 <h1>pkgproxy</h1>
 <p>Caching forward proxy for Linux package repositories.</p>
-{{range $name, $repo := .Repositories}}
-<h2>{{$name}}</h2>
+{{range .}}
+<h2>{{.Name}}</h2>
 <p><strong>Mirrors:</strong></p>
-<ul>{{range $repo.Mirrors}}<li><a href="{{.}}">{{.}}</a></li>{{end}}</ul>
-{{with repoSnippet $name}}
+<ul>{{range .Mirrors}}<li><a href="{{.}}">{{.}}</a></li>{{end}}</ul>
+{{with repoSnippet .Name}}
 <p><strong>Configuration snippet:</strong></p>
 <pre>{{.}}</pre>
 {{end}}
@@ -97,6 +98,27 @@ var snippetFuncs = map[string]func(string) string{
 	},
 }
 
+// repoEntry holds a repository name and its configuration for template rendering.
+type repoEntry struct {
+	Name    string
+	Mirrors []string
+}
+
+// sortedRepos returns repository entries sorted alphabetically by name.
+func sortedRepos(config *RepoConfig) []repoEntry {
+	names := make([]string, 0, len(config.Repositories))
+	for name := range config.Repositories {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	entries := make([]repoEntry, 0, len(names))
+	for _, name := range names {
+		entries = append(entries, repoEntry{Name: name, Mirrors: config.Repositories[name].Mirrors})
+	}
+	return entries
+}
+
 // LandingHandler returns an Echo handler that renders an HTML overview page
 // listing all configured repositories, their mirrors, and package manager snippets.
 // publicAddr is the address (host or host:port) rendered in config snippets.
@@ -115,6 +137,6 @@ func LandingHandler(config *RepoConfig, publicAddr string) echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		c.Response().Header().Set(echo.HeaderContentType, "text/html; charset=UTF-8")
 		c.Response().WriteHeader(http.StatusOK)
-		return tmpl.Execute(c.Response(), config)
+		return tmpl.Execute(c.Response(), sortedRepos(config))
 	}
 }
