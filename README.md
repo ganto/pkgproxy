@@ -56,9 +56,9 @@ repositories:
 ```
 
 With `retries: 3`, pkgproxy will attempt each mirror up to 3 times before moving
-on to the next one. A 1-second delay is applied between retry attempts. Only 5xx
-(server error) responses trigger a retry — client errors like 404 are returned
-immediately.
+on to the next one. An exponential backoff is applied between retry attempts
+(1s, 2s, 4s, ...). Only 5xx (server error) responses trigger a retry — client
+errors like 404 are returned immediately.
 
 ## Client Configuration
 

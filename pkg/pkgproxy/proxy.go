@@ -37,9 +37,9 @@ type (
 	}
 
 	pkgProxy struct {
-		transport  http.RoundTripper
-		upstreams  map[string]upstream
-		retryDelay time.Duration
+		transport      http.RoundTripper
+		upstreams      map[string]upstream
+		retryBaseDelay time.Duration
 	}
 	upstream struct {
 		cache   cache.FileCache
@@ -96,8 +96,8 @@ var (
 	// Default number of attempts per mirror (1 = no retry)
 	defaultRetries = 1
 
-	// Delay between retry attempts for the same mirror
-	retryDelay = 1 * time.Second
+	// Base delay for exponential backoff between retry attempts (1s, 2s, 4s, ...)
+	retryBaseDelay = 1 * time.Second
 
 	// Status codes which will trigger a new request to the "Location" header
 	redirectStatusCodes = []int{
@@ -138,9 +138,9 @@ func New(config *PkgProxyConfig) PkgProxy {
 		}
 	}
 	return &pkgProxy{
-		transport:  transport,
-		upstreams:  upstreams,
-		retryDelay: retryDelay,
+		transport:      transport,
+		upstreams:      upstreams,
+		retryBaseDelay: retryBaseDelay,
 	}
 }
 
@@ -301,8 +301,9 @@ func (pp *pkgProxy) tryMirrors(ctx context.Context, rid string, req *http.Reques
 			}
 
 			if attempt > 1 {
-				slog.Info("retrying mirror", "request_id", rid, "mirror_index", i, "attempt", attempt)
-				timer := time.NewTimer(pp.retryDelay)
+				delay := pp.retryBaseDelay * (1 << (attempt - 2))
+				slog.Info("retrying mirror", "request_id", rid, "mirror_index", i, "attempt", attempt, "delay", delay)
+				timer := time.NewTimer(delay)
 				select {
 				case <-timer.C:
 				case <-ctx.Done():

@@ -56,7 +56,7 @@ func newTestProxyWithRetries(t *testing.T, mirrors []string, retries int) (PkgPr
 		CacheBasePath:    cacheDir,
 		RepositoryConfig: repoConfig,
 	})
-	pp.(*pkgProxy).retryDelay = 0
+	pp.(*pkgProxy).retryBaseDelay = 0
 	return pp, cacheDir
 }
 
