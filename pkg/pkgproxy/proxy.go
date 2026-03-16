@@ -314,9 +314,10 @@ func (pp *pkgProxy) tryMirrors(ctx context.Context, rid string, req *http.Reques
 
 			upstreamPath := path.Join(mirror.Path, strings.TrimPrefix(req.URL.Path, "/"+repo))
 			rsp, err = pp.forwardClientRequestToOrigin(ctx, rid, req, &url.URL{
-				Scheme: mirror.Scheme,
-				Host:   mirror.Host,
-				Path:   upstreamPath,
+				Scheme:   mirror.Scheme,
+				Host:     mirror.Host,
+				Path:     upstreamPath,
+				RawQuery: req.URL.RawQuery,
 			}, reqBody)
 			if err != nil {
 				slog.Warn("upstream request failed", "request_id", rid, "mirror_index", i, "attempt", attempt, "error", err)

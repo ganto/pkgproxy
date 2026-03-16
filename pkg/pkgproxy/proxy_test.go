@@ -587,6 +587,25 @@ func TestForwardProxyUpstreamPath(t *testing.T) {
 	assert.Equal(t, "/basepath/sub/dir/file.rpm", receivedPath)
 }
 
+func TestForwardProxyQueryStringPreserved(t *testing.T) {
+	var receivedRawQuery string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedRawQuery = r.URL.RawQuery
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	pp, _ := newTestProxy(t, []string{upstream.URL + "/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/repodata/repomd.xml?age=300&arch=x86_64", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "age=300&arch=x86_64", receivedRawQuery)
+}
+
 // --- httpbin.org tests (gated by environment variable) ---
 
 func TestForwardProxyWithHttpbin(t *testing.T) {
