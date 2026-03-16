@@ -52,9 +52,7 @@ func TestResolvePublicAddr(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.envValue != "" {
-				t.Setenv(publicHostEnvVar, tt.envValue)
-			}
+			t.Setenv(publicHostEnvVar, tt.envValue)
 			got := resolvePublicAddr(tt.flagValue, tt.listenAddr, tt.listenPort)
 			assert.Equal(t, tt.want, got)
 		})
