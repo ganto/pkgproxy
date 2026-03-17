@@ -3,6 +3,7 @@
 package pkgproxy
 
 import (
+	"bytes"
 	"html/template"
 	"net/http"
 	"sort"
@@ -135,8 +136,13 @@ func LandingHandler(config *RepoConfig, publicAddr string) echo.HandlerFunc {
 	tmpl := template.Must(template.New("landing").Funcs(funcMap).Parse(landingTemplate))
 
 	return func(c *echo.Context) error {
+		var buf bytes.Buffer
+		if err := tmpl.Execute(&buf, sortedRepos(config)); err != nil {
+			return err
+		}
 		c.Response().Header().Set(echo.HeaderContentType, "text/html; charset=UTF-8")
 		c.Response().WriteHeader(http.StatusOK)
-		return tmpl.Execute(c.Response(), sortedRepos(config))
+		_, err := buf.WriteTo(c.Response())
+		return err
 	}
 }
