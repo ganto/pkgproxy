@@ -23,6 +23,19 @@ podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z ghcr.io/ganto/pkgp
 podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z --volume ./pkgproxy.yaml:/ko-app/pkgproxy.yaml ghcr.io/ganto/pkgproxy serve --host 0.0.0.0 --config /ko-app/pkgproxy.yaml
 ```
 
+## Server Configuration
+
+### CLI Flags
+
+| Flag | Env Variable | Default | Description |
+|------|--------------|---------|-------------|
+| `--config, -c` | `PKGPROXY_CONFIG` | `./pkgproxy.yaml` | Path to the repository config file |
+| `--cachedir` | | `cache` | Path to the local cache directory |
+| `--host` | | `localhost` | Listen address |
+| `--port` | | `8080` | Listen port |
+| `--public-host` | `PKGPROXY_PUBLIC_HOST` | | Public hostname (or `host:port`) shown in landing page config snippets. When set, the listen port is not appended. Useful when running behind a reverse proxy. |
+| `--debug` | | `false` | Enable debug logging |
+
 ## Repository Configuration
 
 An example repository configuration can be found at [configs/pkgproxy.yaml](configs/pkgproxy.yaml).
@@ -148,7 +161,7 @@ For Enterprise distributions the URL suffix `epel-$releasever-$basearch` must be
 ```
 [baseos]
 # mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever$rltype
-baseurl=http://<pkgproxy>:8080/rocky/$releasever/BaseOS/$basearch/os/
+baseurl=http://<pkgproxy>:8080/rockylinux/$releasever/BaseOS/$basearch/os/
 ```
 
 ### Ubuntu

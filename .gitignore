@@ -1,2 +1,11 @@
-/bin
-/cache
+# build and testing artifacts
+/bin/
+/cache/
+
+# local openspec setup
+package.json
+package-lock.json
+/node_modules/
+
+# local claude settings/skills
+/.claude/

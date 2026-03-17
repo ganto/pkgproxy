@@ -124,7 +124,7 @@ run: format vet generate ## Run the application from your host
 	$(info *************************************************)
 	$(info ********** EXECUTING 'run' MAKE TARGET **********)
 	$(info *************************************************)
-	PKGPROXY_CONFIG=./configs/pkgproxy.yaml CGO_ENABLED=$(CGO_ENABLED) go run . serve --host 0.0.0.0 --debug
+	PKGPROXY_CONFIG=./configs/pkgproxy.yaml PKGPROXY_PUBLIC_HOST=$(shell hostname):8080 CGO_ENABLED=$(CGO_ENABLED) go run . serve --host 0.0.0.0 --debug
 
 .PHONY: clean
 clean: ## Cleanup binary
