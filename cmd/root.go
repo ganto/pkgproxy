@@ -3,7 +3,7 @@
 package cmd
 
 import (
-	"log/slog"
+	"fmt"
 	"os"
 
 	"github.com/ganto/pkgproxy/pkg/pkgproxy"
@@ -41,15 +41,12 @@ Complete documentation is available at https://github.com/ganto/pkgproxy`,
 	c.PersistentFlags().StringVarP(&configPath, "config", "c", defaultConfigPath, "path to the repository config file")
 	c.PersistentFlags().BoolVar(&enableDebug, "debug", false, "enable debugging")
 	c.AddCommand(newServeCommand())
+	c.AddCommand(newVersionCommand())
 
 	return c
 }
 
-func init() {
-	cobra.OnInitialize(initConfig)
-}
-
-func initConfig() {
+func initConfig() error {
 	if configPath == defaultConfigPath {
 		value, found := os.LookupEnv(configPathEnvVar)
 		if found {
@@ -58,9 +55,9 @@ func initConfig() {
 	}
 
 	if err := pkgproxy.LoadConfig(&repoConfig, configPath); err != nil {
-		slog.Error("unable to load configuration", "path", configPath, "error", err)
-		os.Exit(1)
+		return fmt.Errorf("unable to load configuration from %s: %w", configPath, err)
 	}
+	return nil
 }
 
 // Execute starts the command

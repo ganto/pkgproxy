@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -31,9 +32,12 @@ const (
 
 func newServeCommand() *cobra.Command {
 	c := &cobra.Command{
-		Use:              "serve",
-		Args:             cobra.ArbitraryArgs,
-		Short:            "Start forward proxy",
+		Use:   "serve",
+		Args:  cobra.ArbitraryArgs,
+		Short: "Start forward proxy",
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+			return initConfig()
+		},
 		RunE:             startServer,
 		TraverseChildren: true,
 	}
@@ -63,6 +67,12 @@ func startServer(_ *cobra.Command, _ []string) error {
 		logLevel = slog.LevelDebug
 	}
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
+	slog.Info("starting pkgproxy",
+		"version", Version,
+		"gitCommit", GitCommit,
+		"goVersion", runtime.Version(),
+		"buildDate", buildDate(),
+	)
 
 	app := echo.New()
 
