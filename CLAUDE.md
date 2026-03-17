@@ -13,6 +13,15 @@ make run                                                 # run locally with debu
 go test -v -race ./pkg/pkgproxy/ -run TestName          # run a single test
 ```
 
+## Pre-commit
+
+Run pre-commit hooks directly with:
+
+```bash
+pre-commit run --all-files
+pre-commit run codespell --all-files
+```
+
 ## Rules
 
 - Run `make ci-check` before committing.
