@@ -17,14 +17,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Compute build metadata
-        env:
-          REVISION: ${{ github.sha }}
-        run: |
-          echo "VERSION=$(git describe --always)" >> "$GITHUB_ENV"
-          echo "REVISION=${REVISION}" >> "$GITHUB_ENV"
-          echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
-
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
@@ -36,6 +28,16 @@ jobs:
 
       - name: Prepare Ko
         uses: ko-build/setup-ko@v0.9
+
+      - name: Compute build metadata
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          {
+            echo BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo REVISION="${REVISION}"
+            echo VERSION="$(git describe --always)"
+          } >> "$GITHUB_ENV"
 
       - name: Build and publish container image
         env:
