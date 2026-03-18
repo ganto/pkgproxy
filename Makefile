@@ -1,6 +1,6 @@
 NAME    := $(shell basename `pwd`)
 SOURCE  := $(shell find . -name "*.go")
-VERSION := $(shell git describe --always)
+VERSION := $(shell git describe --tags --always)
 COMMIT  := $(shell git rev-parse --short HEAD)
 DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 

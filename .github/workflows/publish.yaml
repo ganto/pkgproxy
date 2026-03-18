@@ -39,7 +39,7 @@ jobs:
           {
             echo BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo REVISION="${REVISION}"
-            echo VERSION="$(git describe --always)"
+            echo VERSION="$(git describe --tags --always)"
           } >> "$GITHUB_ENV"
 
       - name: Build and publish container image
