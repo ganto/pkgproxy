@@ -1,0 +1,7 @@
+builds:
+  - id: pkgproxy
+    main: .
+    ldflags:
+      - -X github.com/ganto/pkgproxy/cmd.Version={{.Env.VERSION}}
+      - -X github.com/ganto/pkgproxy/cmd.GitCommit={{.Env.REVISION}}
+      - -X github.com/ganto/pkgproxy/cmd.BuildDate={{.Env.BUILD_DATE}}
