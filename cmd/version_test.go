@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"bytes"
-	"os"
 	"runtime"
 	"testing"
 	"time"
@@ -55,29 +54,16 @@ func TestVersionCommandOutput(t *testing.T) {
 	cmd.SetOut(buf)
 	cmd.SetArgs([]string{})
 
-	// The command writes to stdout via fmt.Printf, so capture it
-	// by redirecting os.Stdout
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	origStdout := os.Stdout
-	os.Stdout = w
-	t.Cleanup(func() { os.Stdout = origStdout })
-
 	require.NoError(t, cmd.Execute())
-	w.Close()
 
-	var out bytes.Buffer
-	_, err = out.ReadFrom(r)
-	require.NoError(t, err)
-
-	output := out.String()
+	output := buf.String()
 	assert.Contains(t, output, "Version:    v0.1.0\n")
 	assert.Contains(t, output, "GitCommit:  abc1234\n")
 	assert.Contains(t, output, "GoVersion:  "+runtime.Version()+"\n")
 	assert.Contains(t, output, "BuildDate:  2026-03-17T10:00:00Z\n")
 
 	// Verify field order: Version before GitCommit before GoVersion before BuildDate
-	lines := bytes.Split(bytes.TrimSpace(out.Bytes()), []byte("\n"))
+	lines := bytes.Split(bytes.TrimSpace(buf.Bytes()), []byte("\n"))
 	require.Len(t, lines, 4)
 	assert.True(t, bytes.HasPrefix(lines[0], []byte("Version:")))
 	assert.True(t, bytes.HasPrefix(lines[1], []byte("GitCommit:")))

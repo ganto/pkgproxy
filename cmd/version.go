@@ -3,7 +3,6 @@
 package cmd
 
 import (
-	"fmt"
 	"runtime"
 	"time"
 
@@ -32,11 +31,11 @@ func newVersionCommand() *cobra.Command {
 		Use:   "version",
 		Short: "Print version information",
 		Args:  cobra.NoArgs,
-		Run: func(_ *cobra.Command, _ []string) {
-			fmt.Printf("Version:    %s\n", Version)
-			fmt.Printf("GitCommit:  %s\n", GitCommit)
-			fmt.Printf("GoVersion:  %s\n", runtime.Version())
-			fmt.Printf("BuildDate:  %s\n", buildDate())
+		Run: func(cmd *cobra.Command, _ []string) {
+			cmd.Printf("Version:    %s\n", Version)
+			cmd.Printf("GitCommit:  %s\n", GitCommit)
+			cmd.Printf("GoVersion:  %s\n", runtime.Version())
+			cmd.Printf("BuildDate:  %s\n", buildDate())
 		},
 	}
 }
