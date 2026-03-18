@@ -63,7 +63,10 @@ jobs:
 
       - name: Extract release notes from CHANGELOG.md
         run: |
-          awk "/^## \[${GITHUB_REF_NAME}\]/{found=1; next} found && /^## \[/{exit} found" CHANGELOG.md > release-notes.md
+          awk -v tag="${GITHUB_REF_NAME}" '
+            /^## \[/ { if (index($0, "## [" tag "]") == 1) { found=1; next } else if (found) { exit } }
+            found
+          ' CHANGELOG.md > release-notes.md
           if [ ! -s release-notes.md ]; then
             echo "Error: No changelog section found for ${GITHUB_REF_NAME} in CHANGELOG.md"
             exit 1
