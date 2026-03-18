@@ -1,15 +1,15 @@
 ---
-name: Publish
+name: Release
 
 on:
   push:
-    branches: ['main']
+    tags: ['v*']
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
       id-token: write
 
@@ -48,7 +48,7 @@ jobs:
         run: |
           KO_DATA_DATE_EPOCH=$(git log -1 --format='%ct')
           export KO_DATA_DATE_EPOCH
-          IMAGE="$(ko build --bare \
+          IMAGE="$(ko build --bare --tags "${GITHUB_REF_NAME}" \
             --image-label org.opencontainers.image.source="${SOURCE_URL}" \
             --image-label org.opencontainers.image.revision="${REVISION}" \
             --image-label org.opencontainers.image.version="${VERSION}" \
@@ -60,3 +60,19 @@ jobs:
             --image-annotation org.opencontainers.image.source="${SOURCE_URL}" \
             --image-annotation org.opencontainers.image.revision="${REVISION}")"
           cosign sign --yes "${IMAGE}"
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          awk -v tag="${GITHUB_REF_NAME}" '
+            /^## \[/ { if (index($0, "## [" tag "]") == 1) { found=1; next } else if (found) { exit } }
+            found
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "Error: No changelog section found for ${GITHUB_REF_NAME} in CHANGELOG.md"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" --notes-file release-notes.md

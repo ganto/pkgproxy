@@ -26,6 +26,8 @@ pre-commit run codespell --all-files
 
 - Run `make ci-check` before committing.
 - Do not delete failing tests.
+- Update the `[Unreleased]` section of `CHANGELOG.md` for every user-facing change made to the codebase.
+- Before pushing a release tag: rename `[Unreleased]` to `[v<version>] - <date>`, add a new empty `[Unreleased]` section above it, and commit.
 
 ## OpenSpec
 

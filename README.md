@@ -173,6 +173,14 @@ deb http://<pkgproxy>:8080/ubuntu  jammy-updates   main restricted universe mult
 deb http://<pkgproxy>:8080/ubuntu  jammy-security  main restricted universe multiverse
 ```
 
+## Releasing
+
+1. Rename the `[Unreleased]` section in `CHANGELOG.md` to `[v<version>] - <date>` and add a new empty `[Unreleased]` section above it.
+2. Commit the changelog update.
+3. Push a version tag (e.g. `git tag v0.1.0 && git push origin v0.1.0`).
+
+The tag push triggers the release workflow which builds a versioned container image, signs it with cosign, and creates a GitHub Release with notes extracted from `CHANGELOG.md`.
+
 ## License
 
 [Apache 2.0](https://spdx.org/licenses/Apache-2.0.html)

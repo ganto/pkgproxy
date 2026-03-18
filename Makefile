@@ -1,8 +1,13 @@
 NAME    := $(shell basename `pwd`)
 SOURCE  := $(shell find . -name "*.go")
-VERSION := $(shell git describe --always)
+VERSION := $(shell git describe --tags --always)
+COMMIT  := $(shell git rev-parse --short HEAD)
+DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
 BIN_DIR := bin/
+
+LDFLAGS_PKG           := github.com/ganto/pkgproxy/cmd
+LDFLAGS               := -X $(LDFLAGS_PKG).Version=$(VERSION) -X $(LDFLAGS_PKG).GitCommit=$(COMMIT) -X $(LDFLAGS_PKG).BuildDate=$(DATE)
 
 GO_INSTALL_ARGS       :=
 GO_INSTALL_ARGS_EXTRA :=
@@ -117,7 +122,7 @@ ci-build: ## To be called to build the application binary in a CI pipeline
 	$(info ******************************************************)
 	$(info ********** EXECUTING 'ci-build' MAKE TARGET **********)
 	$(info ******************************************************)
-	CGO_ENABLED=$(CGO_ENABLED) go build $(GO_BUILD_ARGS) $(GO_BUILD_ARGS_EXTRA) -o $(BIN_DIR)$(NAME) .
+	CGO_ENABLED=$(CGO_ENABLED) go build $(GO_BUILD_ARGS) $(GO_BUILD_ARGS_EXTRA) -ldflags '$(LDFLAGS)' -o $(BIN_DIR)$(NAME) .
 
 .PHONY: run
 run: format vet generate ## Run the application from your host
