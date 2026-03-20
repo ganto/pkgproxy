@@ -6,7 +6,7 @@ pkgproxy's existing tests use mock HTTP servers (`httptest.NewServer`) to simula
 
 - Add end-to-end tests that start a real pkgproxy process, run real Linux distribution containers (via podman or docker, auto-detected with override), and exercise real package managers (`dnf`, `apt`, `pacman`) against real upstream mirrors through the proxy.
 - Update landing page configuration snippets for Debian/Ubuntu to use `<release>` placeholders instead of hardcoded codenames, keeping them release-agnostic and in sync with what e2e tests validate.
-- Update README client configuration examples for Debian/Ubuntu to use current stable releases (bookworm, noble) with a note to substitute the actual codename. Fix stale hostname in CentOS Stream example.
+- Update README client configuration examples for Debian/Ubuntu to use current stable releases (trixie, noble) with a note to substitute the actual codename. Fix stale hostname in CentOS Stream example.
 - Add a `make e2e` target and gate the tests behind a `//go:build e2e` build tag.
 
 ## Capabilities

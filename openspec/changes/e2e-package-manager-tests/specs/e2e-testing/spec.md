@@ -75,7 +75,7 @@ The test suite SHALL include a COPR subtest using the same `fedora:43` container
 - **THEN** the cache directory contains at least one `.rpm` file under the `copr/` subdirectory tree (recursive search)
 
 ### Requirement: Debian e2e test
-The test suite SHALL include a Debian subtest using a `debian:bookworm` container that configures apt to use pkgproxy for the `debian` and `debian-security` repositories, refreshes metadata, and installs a small package (e.g. `tree`).
+The test suite SHALL include a Debian subtest using a `debian:trixie` container that configures apt to use pkgproxy for the `debian` and `debian-security` repositories, refreshes metadata, and installs a small package (e.g. `tree`).
 
 #### Scenario: Debian metadata refresh succeeds
 - **WHEN** the Debian container runs `apt update` through pkgproxy

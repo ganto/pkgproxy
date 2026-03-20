@@ -95,14 +95,13 @@ Server = http://<pkgproxy>:8080/archlinux/$repo/os/$arch
 
 ### Debian
 
-E.g. Debian 11 Bullseye: `/etc/apt/sources.list`:
+E.g. Debian 13 Trixie: `/etc/apt/sources.list` (substitute your release codename):
 ```
-deb http://<pkgproxy>:8080/debian           bullseye            main contrib non-free
-deb http://<pkgproxy>:8080/debian           bullseye-updates    main contrib non-free
-deb http://<pkgproxy>:8080/debian           bullseye-backports  main contrib non-free
-deb http://<pkgproxy>:8080/debian-security  bullseye-security   main contrib non-free
+deb http://<pkgproxy>:8080/debian           trixie            main contrib non-free non-free-firmware
+deb http://<pkgproxy>:8080/debian           trixie-updates    main contrib non-free non-free-firmware
+deb http://<pkgproxy>:8080/debian           trixie-backports  main contrib non-free non-free-firmware
+deb http://<pkgproxy>:8080/debian-security  trixie-security   main contrib non-free non-free-firmware
 ```
-Adapt configuration accordingly for other Debian releases.
 
 ### CentOS
 
@@ -124,7 +123,7 @@ baseurl=http://<pkgproxy>:8080/centos/$stream/BaseOS/$basearch/os/
 ```
 [baseos]
 # metalink=https://mirrors.centos.org/metalink?repo=centos-baseos-$stream&arch=$basearch&protocol=https,http
-baseurl=http://merkur.oasis.home:8080/centos-stream/$stream/BaseOS/$basearch/os/
+baseurl=http://<pkgproxy>:8080/centos-stream/$stream/BaseOS/$basearch/os/
 ```
 
 ### EPEL
@@ -166,11 +165,11 @@ baseurl=http://<pkgproxy>:8080/rockylinux/$releasever/BaseOS/$basearch/os/
 
 ### Ubuntu
 
-E.g. Ubuntu 22.04 Jammy Jellyfish: `/etc/apt/sources.list`:
+E.g. Ubuntu 24.04 Noble Numbat: `/etc/apt/sources.list` (substitute your release codename):
 ```
-deb http://<pkgproxy>:8080/ubuntu  jammy           main restricted universe multiverse
-deb http://<pkgproxy>:8080/ubuntu  jammy-updates   main restricted universe multiverse
-deb http://<pkgproxy>:8080/ubuntu  jammy-security  main restricted universe multiverse
+deb http://<pkgproxy>:8080/ubuntu  noble           main restricted universe multiverse
+deb http://<pkgproxy>:8080/ubuntu  noble-updates   main restricted universe multiverse
+deb http://<pkgproxy>:8080/ubuntu  noble-security  main restricted universe multiverse
 ```
 
 ## Building the Container Image

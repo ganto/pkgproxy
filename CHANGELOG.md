@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/ganto/pkgproxy/commits/HEAD/)
 
+### Added
+
+- End-to-end tests using real package managers (dnf, apt, pacman) in containers via `make e2e`
+
+### Changed
+
+- Landing page snippets for Debian/Ubuntu use `<release>` placeholder instead of hardcoded codenames
+- README client configuration examples updated to current stable releases (Debian trixie, Ubuntu noble)
+
 ## [v0.1.0](https://github.com/ganto/pkgproxy/releases/tag/v0.1.0) - 2026-03-20
 
 ### Added

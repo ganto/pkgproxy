@@ -35,7 +35,7 @@ The test auto-detects the container runtime: it checks for `podman` first, then 
 
 ### 2. Real package managers in real distro containers
 
-**Decision:** Use `fedora:43`, `debian:bookworm`, and `archlinux:latest` container images. Run actual `dnf`, `apt`, and `pacman` commands to refresh metadata and install a small package.
+**Decision:** Use `fedora:43`, `debian:trixie`, and `archlinux:latest` container images. Run actual `dnf`, `apt`, and `pacman` commands to refresh metadata and install a small package.
 
 **Alternatives considered:**
 - *Replay HTTP request patterns with curl/Go client:* Would miss package manager quirks (parallel downloads, GPG verification, redirect handling).
@@ -76,7 +76,7 @@ The test auto-detects the container runtime: it checks for `podman` first, then 
 
 ### 7. Release-agnostic landing page snippets
 
-**Decision:** Change Debian/Ubuntu snippets in `landing.go` from hardcoded codenames (`bullseye`, `jammy`) to `<release>` placeholders, matching the existing COPR pattern (`<user>/<repo>`). RPM-based snippets already use `$releasever`. The README keeps concrete examples (updated from `bullseye` to `bookworm` for Debian, from `jammy` to current Ubuntu release) with a note to substitute the actual codename.
+**Decision:** Change Debian/Ubuntu snippets in `landing.go` from hardcoded codenames (`bullseye`, `jammy`) to `<release>` placeholders, matching the existing COPR pattern (`<user>/<repo>`). RPM-based snippets already use `$releasever`. The README keeps concrete examples (updated from `bullseye` to `trixie` for Debian, from `jammy` to current Ubuntu release) with a note to substitute the actual codename.
 
 **Rationale:** Eliminates snippet staleness in the landing page. E2e tests substitute concrete releases; users substitute their own. The README retains concrete examples for readability. The landing page snippets match the README in *structure* but use placeholders where the README uses concrete codenames.
 
