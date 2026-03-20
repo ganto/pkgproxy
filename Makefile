@@ -167,7 +167,7 @@ image-build: ## Build container image with ko
 		$(if $(SOURCE_URL),--image-label org.opencontainers.image.url=$(SOURCE_URL)) \
 		--image-label org.opencontainers.image.vendor=ganto \
 		--image-label org.opencontainers.image.version=$(VERSION) \
-		| tee image-ref.out
+	> image-ref.out && cat image-ref.out
 
 .PHONY: clean
 clean: ## Cleanup binary
