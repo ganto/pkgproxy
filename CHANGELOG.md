@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/ganto/pkgproxy/commits/HEAD/)
 
+## [v0.1.0](https://github.com/ganto/pkgproxy/releases/tag/v0.1.0) - 2026-03-20
+
 ### Added
 
 - Caching forward proxy for Linux package repositories
