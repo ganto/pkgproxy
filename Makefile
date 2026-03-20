@@ -1,13 +1,14 @@
 NAME    := $(shell basename `pwd`)
 SOURCE  := $(shell find . -name "*.go")
-VERSION := $(shell git describe --tags --always)
-COMMIT  := $(shell git rev-parse --short HEAD)
-DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+VERSION ?= $(shell git describe --tags --always)
+REVISION ?= $(shell git rev-parse HEAD)
+BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+ARCHS   ?= $(shell go env GOARCH)
 
 BIN_DIR := bin/
 
 LDFLAGS_PKG           := github.com/ganto/pkgproxy/cmd
-LDFLAGS               := -X $(LDFLAGS_PKG).Version=$(VERSION) -X $(LDFLAGS_PKG).GitCommit=$(COMMIT) -X $(LDFLAGS_PKG).BuildDate=$(DATE)
+LDFLAGS               := -X $(LDFLAGS_PKG).Version=$(VERSION) -X $(LDFLAGS_PKG).GitCommit=$(REVISION) -X $(LDFLAGS_PKG).BuildDate=$(BUILD_DATE)
 
 GO_INSTALL_ARGS       :=
 GO_INSTALL_ARGS_EXTRA :=
@@ -131,12 +132,49 @@ run: format vet generate ## Run the application from your host
 	$(info *************************************************)
 	PKGPROXY_CONFIG=./configs/pkgproxy.yaml PKGPROXY_PUBLIC_HOST=$(shell hostname):8080 CGO_ENABLED=$(CGO_ENABLED) go run . serve --host 0.0.0.0 --debug
 
+PLATFORMS := $(shell echo $(ARCHS) | sed 's/,/ /g' | sed 's/[^ ]\+/linux\/&/g' | tr ' ' ',')
+
+.PHONY: image-build
+image-build: ## Build container image with ko
+	$(info ***********************************************************)
+	$(info ********** EXECUTING 'image-build' MAKE TARGET ************)
+	$(info ***********************************************************)
+	KO_DOCKER_REPO=$${KO_DOCKER_REPO:-ko.local} \
+	KO_DATA_DATE_EPOCH=$$(git log -1 --format='%ct') \
+	VERSION=$(VERSION) \
+	REVISION=$(REVISION) \
+	BUILD_DATE=$(BUILD_DATE) \
+	ko build --bare \
+		--platform $(PLATFORMS) \
+		$(if $(IMAGE_TAGS),--tags $(IMAGE_TAGS)) \
+		--image-annotation org.opencontainers.image.authors='Reto Gantenbein https://github.com/ganto' \
+		--image-annotation org.opencontainers.image.created=$(BUILD_DATE) \
+		--image-annotation org.opencontainers.image.description='Caching forward proxy for Linux package repositories' \
+		--image-annotation org.opencontainers.image.licenses=Apache-2.0 \
+		--image-annotation org.opencontainers.image.revision=$(REVISION) \
+		$(if $(SOURCE_URL),--image-annotation org.opencontainers.image.source=$(SOURCE_URL)) \
+		--image-annotation org.opencontainers.image.title=pkgproxy \
+		$(if $(SOURCE_URL),--image-annotation org.opencontainers.image.url=$(SOURCE_URL)) \
+		--image-annotation org.opencontainers.image.vendor=ganto \
+		--image-annotation org.opencontainers.image.version=$(VERSION) \
+		--image-label org.opencontainers.image.authors='Reto Gantenbein https://github.com/ganto' \
+		--image-label org.opencontainers.image.created=$(BUILD_DATE) \
+		--image-label org.opencontainers.image.description='Caching forward proxy for Linux package repositories' \
+		--image-label org.opencontainers.image.licenses=Apache-2.0 \
+		--image-label org.opencontainers.image.revision=$(REVISION) \
+		$(if $(SOURCE_URL),--image-label org.opencontainers.image.source=$(SOURCE_URL)) \
+		--image-label org.opencontainers.image.title=pkgproxy \
+		$(if $(SOURCE_URL),--image-label org.opencontainers.image.url=$(SOURCE_URL)) \
+		--image-label org.opencontainers.image.vendor=ganto \
+		--image-label org.opencontainers.image.version=$(VERSION) \
+	> image-ref.out && cat image-ref.out
+
 .PHONY: clean
 clean: ## Cleanup binary
 	$(info ***************************************************)
 	$(info ********** EXECUTING 'clean' MAKE TARGET **********)
 	$(info ***************************************************)
-	rm -rvf $(BIN_DIR)
+	rm -rvf $(BIN_DIR) image-ref.out
 
 .PHONY: all
 all: format vet lint govulncheck test build

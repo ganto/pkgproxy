@@ -1,4 +1,4 @@
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: OCI manifest annotations are consistent with image labels
 The container image build step SHALL attach the following `org.opencontainers.image` annotations to the OCI manifest using `ko build --image-annotation`, mirroring all label values and overriding any annotations inherited from the Chainguard base image with the same keys:

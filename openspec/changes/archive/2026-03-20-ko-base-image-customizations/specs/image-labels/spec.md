@@ -1,4 +1,4 @@
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: OCI image labels are embedded at build time
 The container image build step SHALL attach the following `org.opencontainers.image` labels to every published image using `ko build --image-label`, overriding any labels inherited from the Chainguard base image with the same keys:

@@ -16,4 +16,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Automatic failover across multiple configured upstream mirrors with optional retry on 5xx responses
 - HTTP landing page listing all configured repositories with ready-to-use client configuration snippets for supported package managers
 - Cache invalidation via HTTP `DELETE` requests to remove individual cached files
-- Container image published to GitHub Container Registry, signed with cosign via GitHub OIDC
+- Multi-architecture container image (amd64 + arm64) published to GitHub Container Registry, signed with cosign via GitHub OIDC
