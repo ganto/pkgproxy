@@ -173,6 +173,22 @@ deb http://<pkgproxy>:8080/ubuntu  jammy-updates   main restricted universe mult
 deb http://<pkgproxy>:8080/ubuntu  jammy-security  main restricted universe multiverse
 ```
 
+## Building the Container Image
+
+Build a container image locally using [ko](https://ko.build/):
+
+```shell
+make image-build
+```
+
+This builds a single-platform image for your host architecture and loads it into the local container runtime via `ko.local`.
+
+To use [Podman](https://podman.io/) instead of Docker, point `DOCKER_HOST` to the Podman socket:
+
+```shell
+DOCKER_HOST=unix://$(podman info --format '{{.Host.RemoteSocket.Path}}') make image-build
+```
+
 ## Releasing
 
 1. Rename the `[Unreleased]` section in `CHANGELOG.md` to `[v<version>] - <date>` and add a new empty `[Unreleased]` section above it.

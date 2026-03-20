@@ -45,18 +45,8 @@ jobs:
       - name: Build and publish container image
         env:
           SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
-        run: |
-          KO_DATA_DATE_EPOCH=$(git log -1 --format='%ct')
-          export KO_DATA_DATE_EPOCH
-          IMAGE="$(ko build --bare \
-            --image-label org.opencontainers.image.source="${SOURCE_URL}" \
-            --image-label org.opencontainers.image.revision="${REVISION}" \
-            --image-label org.opencontainers.image.version="${VERSION}" \
-            --image-label org.opencontainers.image.created="${BUILD_DATE}" \
-            --image-label org.opencontainers.image.title=pkgproxy \
-            --image-label org.opencontainers.image.vendor=ganto \
-            --image-label org.opencontainers.image.licenses=Apache-2.0 \
-            --image-label 'org.opencontainers.image.description=Caching forward proxy for Linux package repositories' \
-            --image-annotation org.opencontainers.image.source="${SOURCE_URL}" \
-            --image-annotation org.opencontainers.image.revision="${REVISION}")"
-          cosign sign --yes "${IMAGE}"
+          ARCHS: amd64,arm64
+        run: make image-build
+
+      - name: Sign container image
+        run: cosign sign --yes "$(cat image-ref.out)"

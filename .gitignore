@@ -1,6 +1,7 @@
 # build and testing artifacts
 /bin/
 /cache/
+image-ref.out
 
 # local openspec setup
 package.json
