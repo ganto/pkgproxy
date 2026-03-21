@@ -16,15 +16,15 @@ pkgproxy SHALL serve an HTML landing page at `GET /` that lists all configured r
 - **THEN** each upstream mirror URL is rendered as an HTML anchor (`<a href="...">`) that opens the mirror in the browser
 
 ### Requirement: Package manager configuration snippets match README
-The landing page SHALL include copy-paste configuration snippets for repositories whose names appear in the project README client configuration section. Snippets MUST use the exact format from the README including the full URI path suffix after the repository name (e.g. `/$releasever/BaseOS/$basearch/os/`), with `<pkgproxy>` replaced by the configured public address. Repositories not documented in the README SHALL have their snippet omitted entirely.
+The landing page SHALL include copy-paste configuration snippets for repositories whose names appear in the project README client configuration section. Snippets MUST match the URL structure from the README including the full URI path suffix after the repository name (e.g. `/$releasever/BaseOS/$basearch/os/`), with `<pkgproxy>` replaced by the configured public address. Repositories not documented in the README SHALL have their snippet omitted entirely. DEB-based snippets (Debian, Ubuntu) SHALL use a `<release>` placeholder instead of hardcoded release codenames, matching the placeholder convention used by the COPR snippet (`<user>`, `<repo>`). The README retains concrete codename examples for readability; the landing page uses placeholders.
 
 #### Scenario: Known RPM repository shows dnf/yum baseurl snippet with full path
 - **WHEN** a repository name matches one documented in the README with `.rpm` suffixes
 - **THEN** the landing page shows the exact `baseurl=http://<address>/<repo>/<path-suffix>` snippet from the README for that repository
 
-#### Scenario: Known DEB repository shows apt sources snippet with suite and components
+#### Scenario: Known DEB repository shows apt sources snippet with release placeholder
 - **WHEN** a repository name matches one documented in the README with `.deb` suffixes
-- **THEN** the landing page shows the exact one or more `deb http://<address>/<repo> <suite> <components>` lines from the README for that repository
+- **THEN** the landing page shows one or more `deb http://<address>/<repo> <release> <components>` lines using `<release>` as a placeholder instead of a hardcoded codename
 
 #### Scenario: Known Arch repository shows pacman mirrorlist snippet with full path
 - **WHEN** a repository name matches one documented in the README with `.tar.zst` or `.pkg.tar.*` suffixes
