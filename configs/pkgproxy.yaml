@@ -82,3 +82,9 @@ repositories:
     mirrors:
       - https://mirror.init7.net/ubuntu/
       - http://archive.ubuntu.com/ubuntu/
+  ubuntu-security:
+    suffixes:
+      - .deb
+    mirrors:
+      - https://mirror.init7.net/ubuntu/
+      - https://security.ubuntu.com/ubuntu/

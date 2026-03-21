@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - End-to-end tests using real package managers (dnf, apt, pacman) in containers via `make e2e`
+- `ubuntu-security` repository in default configuration
 
 ### Changed
 

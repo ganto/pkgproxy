@@ -97,12 +97,25 @@ test: ## Run the tests against the codebase
 	$(info **************************************************)
 	go test $(GO_TEST_ARGS) $(GO_TEST_ARGS_EXTRA) ./...
 
+# distroToTest converts a DISTRO value to the corresponding Go test function name.
+# Usage: $(call distroToTest,fedora) → TestFedora
+define distroToTest
+$(strip $(if $(filter fedora,$(1)),TestFedora,\
+$(if $(filter centos-stream,$(1)),TestCentOSStream,\
+$(if $(filter almalinux,$(1)),TestAlmaLinux,\
+$(if $(filter rockylinux,$(1)),TestRockyLinux,\
+$(if $(filter debian,$(1)),TestDebian,\
+$(if $(filter ubuntu,$(1)),TestUbuntu,\
+$(if $(filter archlinux,$(1)),TestArch,\
+$(error Unknown DISTRO: $(1). Use one of: fedora centos-stream almalinux rockylinux debian ubuntu archlinux)))))))))
+endef
+
 .PHONY: e2e
-e2e: ## Run end-to-end tests (requires podman or docker)
+e2e: ## Run end-to-end tests (requires podman or docker). Use DISTRO= and RELEASE= to filter.
 	$(info *************************************************)
 	$(info ********** EXECUTING 'e2e' MAKE TARGET **********)
 	$(info *************************************************)
-	go test -tags e2e $(GO_TEST_ARGS) $(GO_TEST_ARGS_EXTRA) ./test/e2e/
+	E2E_RELEASE=$(RELEASE) go test -tags e2e -timeout 15m $(GO_TEST_ARGS) $(GO_TEST_ARGS_EXTRA) $(if $(DISTRO),-run $(call distroToTest,$(DISTRO))) ./test/e2e/
 
 .PHONY: coverage
 coverage: ## Generates test coverage report

@@ -16,14 +16,45 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// pkgproxyBin holds the path to the pre-built pkgproxy binary (set in TestMain).
+var pkgproxyBin string
+
 // containerRuntime holds the detected container runtime binary name.
 var containerRuntime string
 
 // hostGateway holds the hostname that containers use to reach the host.
 var hostGateway string
 
+func TestMain(m *testing.M) {
+	// Build pkgproxy binary once for all test functions.
+	tmpDir, err := os.MkdirTemp("", "pkgproxy-e2e-*")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create temp dir: %v\n", err)
+		os.Exit(1)
+	}
+	bin := filepath.Join(tmpDir, "pkgproxy")
+	cmd := exec.Command("go", "build", "-o", bin, ".")
+	cmd.Dir = projectRoot()
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "build failed: %s\n%v\n", out, err)
+		os.RemoveAll(tmpDir)
+		os.Exit(1)
+	}
+	pkgproxyBin = bin
+
+	code := m.Run()
+	os.RemoveAll(tmpDir)
+	os.Exit(code)
+}
+
 func detectContainerRuntime(t *testing.T) {
 	t.Helper()
+
+	if containerRuntime != "" {
+		return
+	}
 
 	if v := os.Getenv("CONTAINER_RUNTIME"); v != "" {
 		if _, err := exec.LookPath(v); err != nil {
@@ -46,6 +77,13 @@ func detectContainerRuntime(t *testing.T) {
 	t.Logf("container runtime: %s, host gateway: %s", containerRuntime, hostGateway)
 }
 
+func releaseOrDefault(defaultRelease string) string {
+	if v := os.Getenv("E2E_RELEASE"); v != "" {
+		return v
+	}
+	return defaultRelease
+}
+
 func freePort(t *testing.T) int {
 	t.Helper()
 	l, err := net.Listen("tcp", "0.0.0.0:0")
@@ -55,27 +93,16 @@ func freePort(t *testing.T) int {
 	return port
 }
 
-func buildPkgproxy(t *testing.T) string {
-	t.Helper()
-	bin := filepath.Join(t.TempDir(), "pkgproxy")
-	cmd := exec.Command("go", "build", "-o", bin, ".")
-	cmd.Dir = filepath.Join(projectRoot())
-	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
-	out, err := cmd.CombinedOutput()
-	require.NoError(t, err, "build failed: %s", out)
-	return bin
-}
-
 func projectRoot() string {
 	// test/e2e/ -> project root
 	wd, _ := os.Getwd()
 	return filepath.Join(wd, "..", "..")
 }
 
-func startPkgproxy(t *testing.T, bin string, port int, cacheDir string) *exec.Cmd {
+func startPkgproxy(t *testing.T, port int, cacheDir string) {
 	t.Helper()
 	configPath := filepath.Join(projectRoot(), "configs", "pkgproxy.yaml")
-	cmd := exec.Command(bin, "serve",
+	cmd := exec.Command(pkgproxyBin, "serve",
 		"--host", "0.0.0.0",
 		"--port", fmt.Sprintf("%d", port),
 		"--config", configPath,
@@ -97,12 +124,11 @@ func startPkgproxy(t *testing.T, bin string, port int, cacheDir string) *exec.Cm
 		conn, err := net.DialTimeout("tcp", addr, 200*time.Millisecond)
 		if err == nil {
 			conn.Close()
-			return cmd
+			return
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 	t.Fatalf("pkgproxy did not become ready on %s", addr)
-	return cmd
 }
 
 func runContainer(t *testing.T, image string, mounts []string, cmdArgs []string) {
@@ -140,77 +166,253 @@ func assertCachedFiles(t *testing.T, cacheDir string, repoPrefix string, suffix 
 	}
 }
 
-func TestE2E(t *testing.T) {
+// setupPkgproxy is a convenience that detects the container runtime, allocates
+// a free port, creates a temp cache dir, and starts a pkgproxy instance.
+// It returns the proxy address and cache directory.
+func setupPkgproxy(t *testing.T) (proxyAddr string, cacheDir string) {
+	t.Helper()
 	detectContainerRuntime(t)
-
-	bin := buildPkgproxy(t)
 	port := freePort(t)
-	cacheDir := t.TempDir()
+	cacheDir = t.TempDir()
+	startPkgproxy(t, port, cacheDir)
+	proxyAddr = fmt.Sprintf("%s:%d", hostGateway, port)
+	return proxyAddr, cacheDir
+}
 
-	startPkgproxy(t, bin, port, cacheDir)
+func scriptDir() string {
+	return filepath.Join(projectRoot(), "test", "e2e")
+}
 
-	proxyAddr := fmt.Sprintf("%s:%d", hostGateway, port)
-	scriptDir := filepath.Join(projectRoot(), "test", "e2e")
+// dnfRepoFile creates a .repo file in a temp directory and returns its path.
+func dnfRepoFile(t *testing.T, name string, content string) string {
+	t.Helper()
+	repoFile := filepath.Join(t.TempDir(), "pkgproxy-"+name+".repo")
+	require.NoError(t, os.WriteFile(repoFile, []byte(content), 0644))
+	return repoFile
+}
 
-	t.Run("Fedora", func(t *testing.T) {
-		repoFile := filepath.Join(t.TempDir(), "pkgproxy-fedora.repo")
-		repoContent := fmt.Sprintf(`[fedora]
+func TestFedora(t *testing.T) {
+	release := releaseOrDefault("43")
+	proxyAddr, cacheDir := setupPkgproxy(t)
+
+	repoFile := dnfRepoFile(t, "fedora", fmt.Sprintf(`[fedora]
 # metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch
 baseurl=http://%s/fedora/releases/$releasever/Everything/$basearch/os/
 gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-$releasever-$basearch
-`, proxyAddr)
-		require.NoError(t, os.WriteFile(repoFile, []byte(repoContent), 0644))
+`, proxyAddr))
 
-		runContainer(t, "fedora:43",
-			[]string{
-				filepath.Join(scriptDir, "test-dnf.sh") + ":/test-dnf.sh:ro,z",
-				repoFile + ":/etc/yum.repos.d/pkgproxy-fedora.repo:ro,z",
-			},
-			[]string{"bash", "/test-dnf.sh", proxyAddr, "tree"},
-		)
-
-		assertCachedFiles(t, cacheDir, "fedora", ".rpm")
-	})
+	image := fmt.Sprintf("docker.io/library/fedora:%s", release)
+	runContainer(t, image,
+		[]string{
+			filepath.Join(scriptDir(), "test-dnf.sh") + ":/test-dnf.sh:ro,z",
+			repoFile + ":/etc/yum.repos.d/pkgproxy-fedora.repo:ro,z",
+		},
+		[]string{"bash", "/test-dnf.sh", proxyAddr, "tree"},
+	)
+	assertCachedFiles(t, cacheDir, "fedora", ".rpm")
 
 	t.Run("COPR", func(t *testing.T) {
-		repoFile := filepath.Join(t.TempDir(), "pkgproxy-copr.repo")
-		repoContent := fmt.Sprintf(`[copr:copr.fedorainfracloud.org:ganto:jo]
+		coprFile := dnfRepoFile(t, "copr", fmt.Sprintf(`[copr:copr.fedorainfracloud.org:ganto:jo]
 baseurl=http://%s/copr/ganto/jo/fedora-$releasever-$basearch/
 gpgcheck=0
-`, proxyAddr)
-		require.NoError(t, os.WriteFile(repoFile, []byte(repoContent), 0644))
+`, proxyAddr))
 
-		runContainer(t, "fedora:43",
+		runContainer(t, image,
 			[]string{
-				filepath.Join(scriptDir, "test-dnf.sh") + ":/test-dnf.sh:ro,z",
-				repoFile + ":/etc/yum.repos.d/pkgproxy-copr.repo:ro,z",
+				filepath.Join(scriptDir(), "test-dnf.sh") + ":/test-dnf.sh:ro,z",
+				coprFile + ":/etc/yum.repos.d/pkgproxy-copr.repo:ro,z",
 			},
 			[]string{"bash", "/test-dnf.sh", proxyAddr, "jo"},
 		)
-
 		assertCachedFiles(t, cacheDir, "copr", ".rpm")
 	})
+}
 
-	t.Run("Debian", func(t *testing.T) {
-		runContainer(t, "debian:trixie",
+func TestDebian(t *testing.T) {
+	release := releaseOrDefault("trixie")
+	proxyAddr, cacheDir := setupPkgproxy(t)
+
+	sourcesList := filepath.Join(t.TempDir(), "sources.list")
+	sourcesContent := fmt.Sprintf(`deb http://%s/debian          %s           main contrib non-free non-free-firmware
+deb http://%s/debian          %s-updates   main contrib non-free non-free-firmware
+deb http://%s/debian-security %s-security  main contrib non-free non-free-firmware
+`, proxyAddr, release, proxyAddr, release, proxyAddr, release)
+	require.NoError(t, os.WriteFile(sourcesList, []byte(sourcesContent), 0644))
+
+	image := fmt.Sprintf("docker.io/library/debian:%s", release)
+	runContainer(t, image,
+		[]string{
+			filepath.Join(scriptDir(), "test-apt.sh") + ":/test-apt.sh:ro,z",
+			sourcesList + ":/etc/apt/sources.list:ro,z",
+		},
+		[]string{"bash", "/test-apt.sh", "tree"},
+	)
+	assertCachedFiles(t, cacheDir, "debian", ".deb")
+}
+
+func TestArch(t *testing.T) {
+	proxyAddr, cacheDir := setupPkgproxy(t)
+
+	runContainer(t, "docker.io/library/archlinux:latest",
+		[]string{
+			filepath.Join(scriptDir(), "test-pacman.sh") + ":/test-pacman.sh:ro,z",
+		},
+		[]string{"bash", "/test-pacman.sh", proxyAddr, "tree"},
+	)
+	assertCachedFiles(t, cacheDir, "archlinux", ".tar.zst")
+}
+
+func TestCentOSStream(t *testing.T) {
+	release := releaseOrDefault("10")
+	proxyAddr, cacheDir := setupPkgproxy(t)
+
+	repoFile := dnfRepoFile(t, "centos-stream", fmt.Sprintf(`[baseos]
+baseurl=http://%s/centos-stream/$releasever-stream/BaseOS/$basearch/os/
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial-SHA256
+`, proxyAddr))
+
+	epelFile := dnfRepoFile(t, "epel", fmt.Sprintf(`[epel]
+baseurl=http://%s/epel/$releasever/Everything/$basearch/
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-$releasever
+`, proxyAddr))
+
+	image := fmt.Sprintf("quay.io/centos/centos:stream%s", release)
+	runContainer(t, image,
+		[]string{
+			filepath.Join(scriptDir(), "test-dnf.sh") + ":/test-dnf.sh:ro,z",
+			repoFile + ":/etc/yum.repos.d/pkgproxy-centos-stream.repo:ro,z",
+			epelFile + ":/etc/yum.repos.d/pkgproxy-epel.repo:ro,z",
+		},
+		[]string{"bash", "/test-dnf.sh", proxyAddr, "tree"},
+	)
+	assertCachedFiles(t, cacheDir, "centos-stream", ".rpm")
+
+	t.Run("COPR", func(t *testing.T) {
+		coprFile := dnfRepoFile(t, "copr", fmt.Sprintf(`[copr:copr.fedorainfracloud.org:ganto:jo]
+baseurl=http://%s/copr/ganto/jo/epel-$releasever-$basearch/
+gpgcheck=0
+`, proxyAddr))
+
+		runContainer(t, image,
 			[]string{
-				filepath.Join(scriptDir, "test-apt.sh") + ":/test-apt.sh:ro,z",
+				filepath.Join(scriptDir(), "test-dnf.sh") + ":/test-dnf.sh:ro,z",
+				coprFile + ":/etc/yum.repos.d/pkgproxy-copr.repo:ro,z",
 			},
-			[]string{"bash", "/test-apt.sh", proxyAddr, "trixie", "tree"},
+			[]string{"bash", "/test-dnf.sh", proxyAddr, "jo"},
 		)
-
-		assertCachedFiles(t, cacheDir, "debian", ".deb")
+		assertCachedFiles(t, cacheDir, "copr", ".rpm")
 	})
+}
 
-	t.Run("Arch", func(t *testing.T) {
-		runContainer(t, "archlinux:latest",
+func TestAlmaLinux(t *testing.T) {
+	release := releaseOrDefault("10")
+	proxyAddr, cacheDir := setupPkgproxy(t)
+
+	repoFile := dnfRepoFile(t, "almalinux", fmt.Sprintf(`[baseos]
+baseurl=http://%s/almalinux/$releasever/BaseOS/$basearch/os/
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-AlmaLinux-$releasever
+`, proxyAddr))
+
+	epelFile := dnfRepoFile(t, "epel", fmt.Sprintf(`[epel]
+baseurl=http://%s/epel/$releasever/Everything/$basearch/
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-$releasever
+`, proxyAddr))
+
+	image := fmt.Sprintf("docker.io/library/almalinux:%s", release)
+	runContainer(t, image,
+		[]string{
+			filepath.Join(scriptDir(), "test-dnf.sh") + ":/test-dnf.sh:ro,z",
+			repoFile + ":/etc/yum.repos.d/pkgproxy-almalinux.repo:ro,z",
+			epelFile + ":/etc/yum.repos.d/pkgproxy-epel.repo:ro,z",
+		},
+		[]string{"bash", "/test-dnf.sh", proxyAddr, "tree"},
+	)
+	assertCachedFiles(t, cacheDir, "almalinux", ".rpm")
+
+	t.Run("COPR", func(t *testing.T) {
+		coprFile := dnfRepoFile(t, "copr", fmt.Sprintf(`[copr:copr.fedorainfracloud.org:ganto:jo]
+baseurl=http://%s/copr/ganto/jo/epel-$releasever-$basearch/
+gpgcheck=0
+`, proxyAddr))
+
+		runContainer(t, image,
 			[]string{
-				filepath.Join(scriptDir, "test-pacman.sh") + ":/test-pacman.sh:ro,z",
+				filepath.Join(scriptDir(), "test-dnf.sh") + ":/test-dnf.sh:ro,z",
+				coprFile + ":/etc/yum.repos.d/pkgproxy-copr.repo:ro,z",
 			},
-			[]string{"bash", "/test-pacman.sh", proxyAddr, "tree"},
+			[]string{"bash", "/test-dnf.sh", proxyAddr, "jo"},
 		)
-
-		assertCachedFiles(t, cacheDir, "archlinux", ".tar.zst")
+		assertCachedFiles(t, cacheDir, "copr", ".rpm")
 	})
+}
+
+func TestRockyLinux(t *testing.T) {
+	release := releaseOrDefault("10")
+	proxyAddr, cacheDir := setupPkgproxy(t)
+
+	repoFile := dnfRepoFile(t, "rockylinux", fmt.Sprintf(`[baseos]
+baseurl=http://%s/rockylinux/$releasever/BaseOS/$basearch/os/
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-$releasever
+`, proxyAddr))
+
+	epelFile := dnfRepoFile(t, "epel", fmt.Sprintf(`[epel]
+baseurl=http://%s/epel/$releasever/Everything/$basearch/
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-$releasever
+`, proxyAddr))
+
+	image := fmt.Sprintf("docker.io/rockylinux/rockylinux:%s", release)
+	runContainer(t, image,
+		[]string{
+			filepath.Join(scriptDir(), "test-dnf.sh") + ":/test-dnf.sh:ro,z",
+			repoFile + ":/etc/yum.repos.d/pkgproxy-rockylinux.repo:ro,z",
+			epelFile + ":/etc/yum.repos.d/pkgproxy-epel.repo:ro,z",
+		},
+		[]string{"bash", "/test-dnf.sh", proxyAddr, "tree"},
+	)
+	assertCachedFiles(t, cacheDir, "rockylinux", ".rpm")
+
+	t.Run("COPR", func(t *testing.T) {
+		coprFile := dnfRepoFile(t, "copr", fmt.Sprintf(`[copr:copr.fedorainfracloud.org:ganto:jo]
+baseurl=http://%s/copr/ganto/jo/epel-$releasever-$basearch/
+gpgcheck=0
+`, proxyAddr))
+
+		runContainer(t, image,
+			[]string{
+				filepath.Join(scriptDir(), "test-dnf.sh") + ":/test-dnf.sh:ro,z",
+				coprFile + ":/etc/yum.repos.d/pkgproxy-copr.repo:ro,z",
+			},
+			[]string{"bash", "/test-dnf.sh", proxyAddr, "jo"},
+		)
+		assertCachedFiles(t, cacheDir, "copr", ".rpm")
+	})
+}
+
+func TestUbuntu(t *testing.T) {
+	release := releaseOrDefault("noble")
+	proxyAddr, cacheDir := setupPkgproxy(t)
+
+	sourcesList := filepath.Join(t.TempDir(), "sources.list")
+	sourcesContent := fmt.Sprintf(`deb http://%s/ubuntu           %s           main restricted universe multiverse
+deb http://%s/ubuntu           %s-updates   main restricted universe multiverse
+deb http://%s/ubuntu-security  %s-security  main restricted universe multiverse
+`, proxyAddr, release, proxyAddr, release, proxyAddr, release)
+	require.NoError(t, os.WriteFile(sourcesList, []byte(sourcesContent), 0644))
+
+	image := fmt.Sprintf("docker.io/library/ubuntu:%s", release)
+	runContainer(t, image,
+		[]string{
+			filepath.Join(scriptDir(), "test-apt.sh") + ":/test-apt.sh:ro,z",
+			sourcesList + ":/etc/apt/sources.list:ro,z",
+		},
+		[]string{"bash", "/test-apt.sh", "tree"},
+	)
+	assertCachedFiles(t, cacheDir, "ubuntu", ".deb")
 }

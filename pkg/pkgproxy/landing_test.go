@@ -82,7 +82,8 @@ func TestLandingHandlerKnownSnippets(t *testing.T) {
 		{"epel", ".rpm", "baseurl=http://localhost:8080/epel/$releasever/Everything/$basearch/"},
 		{"fedora", ".rpm", "baseurl=http://localhost:8080/fedora/releases/$releasever/Everything/$basearch/os/"},
 		{"rockylinux", ".rpm", "baseurl=http://localhost:8080/rockylinux/$releasever/BaseOS/$basearch/os/"},
-		{"ubuntu", ".deb", "deb http://localhost:8080/ubuntu  &lt;release&gt;           main restricted universe multiverse"},
+		{"ubuntu", ".deb", "deb http://localhost:8080/ubuntu           &lt;release&gt;           main restricted universe multiverse"},
+		{"ubuntu-security", ".deb", "deb http://localhost:8080/ubuntu-security  &lt;release&gt;-security  main restricted universe multiverse"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.repo, func(t *testing.T) {

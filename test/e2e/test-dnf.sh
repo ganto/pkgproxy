@@ -16,6 +16,12 @@ echo "==> Packages: ${PACKAGES[*]}"
 # Remove all default repo files so only the mounted pkgproxy repo is used.
 find /etc/yum.repos.d/ -name '*.repo' ! -name 'pkgproxy-*' -delete
 
+echo "==> Repo files:"
+for f in /etc/yum.repos.d/pkgproxy-*.repo; do
+  echo "--- ${f} ---"
+  cat "${f}"
+done
+
 dnf makecache
 dnf install -y "${PACKAGES[@]}"
 
