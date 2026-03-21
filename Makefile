@@ -97,6 +97,13 @@ test: ## Run the tests against the codebase
 	$(info **************************************************)
 	go test $(GO_TEST_ARGS) $(GO_TEST_ARGS_EXTRA) ./...
 
+.PHONY: e2e
+e2e: ## Run end-to-end tests (requires podman or docker)
+	$(info *************************************************)
+	$(info ********** EXECUTING 'e2e' MAKE TARGET **********)
+	$(info *************************************************)
+	go test -tags e2e $(GO_TEST_ARGS) $(GO_TEST_ARGS_EXTRA) ./test/e2e/
+
 .PHONY: coverage
 coverage: ## Generates test coverage report
 	$(info ******************************************************)

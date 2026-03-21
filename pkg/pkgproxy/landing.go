@@ -70,12 +70,12 @@ var snippetFuncs = map[string]func(string) string{
 			"baseurl=http://" + addr + "/copr/<user>/<repo>/fedora-$releasever-$basearch/"
 	},
 	"debian": func(addr string) string {
-		return "deb http://" + addr + "/debian           bullseye            main contrib non-free\n" +
-			"deb http://" + addr + "/debian           bullseye-updates    main contrib non-free\n" +
-			"deb http://" + addr + "/debian           bullseye-backports  main contrib non-free"
+		return "deb http://" + addr + "/debian           <release>            main contrib non-free non-free-firmware\n" +
+			"deb http://" + addr + "/debian           <release>-updates    main contrib non-free non-free-firmware\n" +
+			"deb http://" + addr + "/debian           <release>-backports  main contrib non-free non-free-firmware"
 	},
 	"debian-security": func(addr string) string {
-		return "deb http://" + addr + "/debian-security  bullseye-security   main contrib non-free"
+		return "deb http://" + addr + "/debian-security  <release>-security   main contrib non-free non-free-firmware"
 	},
 	"epel": func(addr string) string {
 		return "[epel]\n" +
@@ -93,9 +93,9 @@ var snippetFuncs = map[string]func(string) string{
 			"baseurl=http://" + addr + "/rockylinux/$releasever/BaseOS/$basearch/os/"
 	},
 	"ubuntu": func(addr string) string {
-		return "deb http://" + addr + "/ubuntu  jammy           main restricted universe multiverse\n" +
-			"deb http://" + addr + "/ubuntu  jammy-updates   main restricted universe multiverse\n" +
-			"deb http://" + addr + "/ubuntu  jammy-security  main restricted universe multiverse"
+		return "deb http://" + addr + "/ubuntu  <release>           main restricted universe multiverse\n" +
+			"deb http://" + addr + "/ubuntu  <release>-updates   main restricted universe multiverse\n" +
+			"deb http://" + addr + "/ubuntu  <release>-security  main restricted universe multiverse"
 	},
 }
 

@@ -77,12 +77,12 @@ func TestLandingHandlerKnownSnippets(t *testing.T) {
 		{"archlinux", ".tar.zst", "Server = http://localhost:8080/archlinux/$repo/os/$arch"},
 		{"centos", ".rpm", "baseurl=http://localhost:8080/centos/$releasever/os/$basearch/"},
 		{"centos-stream", ".rpm", "baseurl=http://localhost:8080/centos-stream/$stream/BaseOS/$basearch/os/"},
-		{"debian", ".deb", "http://localhost:8080/debian"},
-		{"debian-security", ".deb", "http://localhost:8080/debian-security"},
+		{"debian", ".deb", "deb http://localhost:8080/debian           &lt;release&gt;            main contrib non-free non-free-firmware"},
+		{"debian-security", ".deb", "deb http://localhost:8080/debian-security  &lt;release&gt;-security   main contrib non-free non-free-firmware"},
 		{"epel", ".rpm", "baseurl=http://localhost:8080/epel/$releasever/Everything/$basearch/"},
 		{"fedora", ".rpm", "baseurl=http://localhost:8080/fedora/releases/$releasever/Everything/$basearch/os/"},
 		{"rockylinux", ".rpm", "baseurl=http://localhost:8080/rockylinux/$releasever/BaseOS/$basearch/os/"},
-		{"ubuntu", ".deb", "http://localhost:8080/ubuntu"},
+		{"ubuntu", ".deb", "deb http://localhost:8080/ubuntu  &lt;release&gt;           main restricted universe multiverse"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.repo, func(t *testing.T) {
