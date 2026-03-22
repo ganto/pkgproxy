@@ -93,9 +93,11 @@ var snippetFuncs = map[string]func(string) string{
 			"baseurl=http://" + addr + "/rockylinux/$releasever/BaseOS/$basearch/os/"
 	},
 	"ubuntu": func(addr string) string {
-		return "deb http://" + addr + "/ubuntu  <release>           main restricted universe multiverse\n" +
-			"deb http://" + addr + "/ubuntu  <release>-updates   main restricted universe multiverse\n" +
-			"deb http://" + addr + "/ubuntu  <release>-security  main restricted universe multiverse"
+		return "deb http://" + addr + "/ubuntu           <release>           main restricted universe multiverse\n" +
+			"deb http://" + addr + "/ubuntu           <release>-updates   main restricted universe multiverse"
+	},
+	"ubuntu-security": func(addr string) string {
+		return "deb http://" + addr + "/ubuntu-security  <release>-security  main restricted universe multiverse"
 	},
 }
 

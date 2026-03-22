@@ -12,6 +12,10 @@ echo "==> Packages: ${PACKAGES[*]}"
 # Configure pacman mirror to use pkgproxy.
 echo "Server = http://${PROXY_ADDR}/archlinux/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist
 
+echo "==> mirrorlist:"
+echo "--- /etc/pacman.d/mirrorlist ---"
+cat /etc/pacman.d/mirrorlist
+
 pacman -Sy
 pacman -S --noconfirm "${PACKAGES[@]}"
 

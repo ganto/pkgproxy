@@ -1,0 +1,57 @@
+---
+name: E2E Tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Fedora 43
+            test: TestFedora
+            release: "43"
+          - name: CentOS Stream 10
+            test: TestCentOSStream
+            release: "10"
+          - name: AlmaLinux 10
+            test: TestAlmaLinux
+            release: "10"
+          - name: Rocky Linux 10
+            test: TestRockyLinux
+            release: "10"
+          - name: Debian trixie
+            test: TestDebian
+            release: trixie
+          - name: Ubuntu noble
+            test: TestUbuntu
+            release: noble
+          - name: Arch Linux latest
+            test: TestArch
+            release: latest
+
+    name: ${{ matrix.name }}
+
+    steps:
+
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 'stable'
+          check-latest: true
+
+      - name: Run e2e test
+        env:
+          E2E_RELEASE: ${{ matrix.release }}
+          CONTAINER_RUNTIME: docker
+        run: go test -tags e2e -v -race -timeout 5m -run ${{ matrix.test }} ./test/e2e/

@@ -167,10 +167,35 @@ baseurl=http://<pkgproxy>:8080/rockylinux/$releasever/BaseOS/$basearch/os/
 
 E.g. Ubuntu 24.04 Noble Numbat: `/etc/apt/sources.list` (substitute your release codename):
 ```
-deb http://<pkgproxy>:8080/ubuntu  noble           main restricted universe multiverse
-deb http://<pkgproxy>:8080/ubuntu  noble-updates   main restricted universe multiverse
-deb http://<pkgproxy>:8080/ubuntu  noble-security  main restricted universe multiverse
+deb http://<pkgproxy>:8080/ubuntu           noble           main restricted universe multiverse
+deb http://<pkgproxy>:8080/ubuntu           noble-updates   main restricted universe multiverse
+deb http://<pkgproxy>:8080/ubuntu-security  noble-security  main restricted universe multiverse
 ```
+
+## Testing
+
+### End-to-End Tests
+
+End-to-end tests validate pkgproxy against real package managers running in containers. They require either [Podman](https://podman.io/) or Docker.
+
+Run all e2e tests:
+```shell
+make e2e
+```
+
+Run tests for a specific distribution:
+```shell
+make e2e DISTRO=fedora
+```
+
+Run tests for a specific distribution and release:
+```shell
+make e2e DISTRO=fedora RELEASE=42
+```
+
+Supported `DISTRO` values: `fedora`, `centos-stream`, `almalinux`, `rockylinux`, `debian`, `ubuntu`, `archlinux`.
+
+When adding support for a new Linux distribution, corresponding e2e tests should be added as well.
 
 ## Building the Container Image
 
