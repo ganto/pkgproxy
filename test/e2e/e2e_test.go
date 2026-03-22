@@ -133,7 +133,9 @@ func startPkgproxy(t *testing.T, port int, cacheDir string) {
 
 func runContainer(t *testing.T, image string, mounts []string, cmdArgs []string) {
 	t.Helper()
-	args := []string{"run", "--rm"}
+	args := []string{"run", "--rm",
+		"--add-host", hostGateway + ":host-gateway",
+	}
 	for _, m := range mounts {
 		args = append(args, "-v", m)
 	}
