@@ -648,8 +648,12 @@ func TestCacheConnectionErrorNoTempFile(t *testing.T) {
 	assert.Equal(t, http.StatusBadGateway, rec.Code)
 
 	// No temp files should be created
-	entries, _ := os.ReadDir(filepath.Join(cacheDir, "testrepo", "path"))
-	assert.Empty(t, entries)
+	entries, err := os.ReadDir(filepath.Join(cacheDir, "testrepo", "path"))
+	if err != nil {
+		assert.True(t, os.IsNotExist(err), "unexpected ReadDir error: %v", err)
+	} else {
+		assert.Empty(t, entries)
+	}
 }
 
 func TestCacheContentLengthMismatchRejectsCommit(t *testing.T) {
