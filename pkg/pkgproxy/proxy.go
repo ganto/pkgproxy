@@ -225,8 +225,12 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		if pp.isRepositoryRequest(uri) && rw != nil {
-			// Close temp file before commit or cleanup
-			_ = rw.Close()
+			// Close temp file before commit or cleanup. A close error means the
+			// file may not have been fully flushed, so skip the commit.
+			if err := rw.Close(); err != nil {
+				slog.Error("cache temp file close failed", "request_id", requestID(c), "uri", uri, "error", err)
+				rw.failed = true
+			}
 
 			resp, _ := echo.UnwrapResponse(c.Response())
 			if repoCache.IsCacheCandidate(uri) && !repoCache.IsCached(uri) && resp != nil && resp.Status == 200 && rw.bytesWritten > 0 && !rw.failed {
