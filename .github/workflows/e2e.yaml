@@ -3,13 +3,30 @@ name: E2E Tests
 
 on:
   workflow_dispatch:
+  pull_request:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
 
+  set-pending:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Set pending e2e status
+    steps:
+      - name: Set pending e2e status
+        run: |
+          gh api "repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }}" \
+            -f state="pending" \
+            -f context="e2e" \
+            -f description="E2E tests must be triggered manually via workflow_dispatch"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   e2e:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -55,3 +72,25 @@ jobs:
           E2E_RELEASE: ${{ matrix.release }}
           CONTAINER_RUNTIME: docker
         run: go test -tags e2e -v -race -timeout 5m -run ${{ matrix.test }} ./test/e2e/
+
+  report-status:
+    if: always() && github.event_name == 'workflow_dispatch'
+    needs: [e2e]
+    runs-on: ubuntu-latest
+    name: Report e2e status
+    steps:
+      - name: Report e2e status
+        run: |
+          if [ "${{ needs.e2e.result }}" = "success" ]; then
+            state="success"
+            description="All E2E tests passed"
+          else
+            state="failure"
+            description="E2E tests failed"
+          fi
+          gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
+            -f state="$state" \
+            -f context="e2e" \
+            -f description="$description"
+        env:
+          GH_TOKEN: ${{ github.token }}
