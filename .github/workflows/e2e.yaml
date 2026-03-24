@@ -81,13 +81,24 @@ jobs:
     steps:
       - name: Report e2e status
         run: |
-          if [ "${{ needs.e2e.result }}" = "success" ]; then
-            state="success"
-            description="All E2E tests passed"
-          else
-            state="failure"
-            description="E2E tests failed"
-          fi
+          case "${{ needs.e2e.result }}" in
+            success)
+              state="success"
+              description="All E2E tests passed"
+              ;;
+            cancelled)
+              state="error"
+              description="E2E tests were cancelled"
+              ;;
+            skipped)
+              state="error"
+              description="E2E tests were skipped"
+              ;;
+            *)
+              state="failure"
+              description="E2E tests failed"
+              ;;
+          esac
           gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
             -f state="$state" \
             -f context="e2e" \
