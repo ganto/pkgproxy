@@ -606,6 +606,149 @@ func TestForwardProxyQueryStringPreserved(t *testing.T) {
 	assert.Equal(t, "age=300&arch=x86_64", receivedRawQuery)
 }
 
+// --- Streaming cache-write tests ---
+
+func TestCacheMissNon200Cleanup(t *testing.T) {
+	// Upstream returns 404 — no file should be cached
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, "not found")
+	}))
+	defer upstream.Close()
+
+	pp, cacheDir := newTestProxy(t, []string{upstream.URL + "/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/package.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+
+	// No temp files or cached files should exist
+	cachedPath := filepath.Join(cacheDir, "testrepo", "path", "package.rpm")
+	_, err := os.Stat(cachedPath)
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestCacheConnectionErrorNoTempFile(t *testing.T) {
+	// Bind to a free port then close it — connection will fail
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	addr := l.Addr().String()
+	l.Close()
+
+	pp, cacheDir := newTestProxy(t, []string{"http://" + addr + "/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/package.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+
+	// No temp files should be created
+	entries, err := os.ReadDir(filepath.Join(cacheDir, "testrepo", "path"))
+	if err != nil {
+		assert.True(t, os.IsNotExist(err), "unexpected ReadDir error: %v", err)
+	} else {
+		assert.Empty(t, entries)
+	}
+}
+
+func TestCacheContentLengthMismatchRejectsCommit(t *testing.T) {
+	// Upstream claims Content-Length: 100 but only sends 5 bytes
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Length", "100")
+		// Bypass Go's automatic Content-Length by hijacking
+		// Actually, just write less — Go's httptest won't enforce CL on server side
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "short")
+	}))
+	defer upstream.Close()
+
+	pp, cacheDir := newTestProxy(t, []string{upstream.URL + "/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/package.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	// File should NOT be cached due to Content-Length mismatch
+	cachedPath := filepath.Join(cacheDir, "testrepo", "path", "package.rpm")
+	_, err := os.Stat(cachedPath)
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestCacheMissingContentLengthSkipsValidation(t *testing.T) {
+	// Upstream sends no Content-Length — should still cache
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Transfer-Encoding", "chunked")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "chunked-data")
+	}))
+	defer upstream.Close()
+
+	pp, cacheDir := newTestProxy(t, []string{upstream.URL + "/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/package.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	// File should be cached since there's no Content-Length to validate
+	cachedPath := filepath.Join(cacheDir, "testrepo", "path", "package.rpm")
+	data, err := os.ReadFile(cachedPath)
+	require.NoError(t, err)
+	assert.Equal(t, "chunked-data", string(data))
+}
+
+func TestCacheDiskWriteErrorDoesNotAffectClient(t *testing.T) {
+	upstreamBody := "upstream-content-for-client"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, upstreamBody)
+	}))
+	defer upstream.Close()
+
+	// Use a read-only cache dir to trigger disk write failure
+	cacheDir := t.TempDir()
+	repoConfig := &RepoConfig{
+		Repositories: map[string]Repository{
+			"testrepo": {
+				CacheSuffixes: []string{".rpm"},
+				Mirrors:       []string{upstream.URL + "/"},
+			},
+		},
+	}
+	pp := New(&PkgProxyConfig{
+		CacheBasePath:    filepath.Join(cacheDir, "readonly"),
+		RepositoryConfig: repoConfig,
+	})
+	// Make the cache base path read-only
+	require.NoError(t, os.MkdirAll(filepath.Join(cacheDir, "readonly"), 0o555))
+
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/package.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	// Client should still receive the response despite cache write failure
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, upstreamBody, rec.Body.String())
+
+	// Restore permissions for cleanup
+	os.Chmod(filepath.Join(cacheDir, "readonly"), 0o755)
+}
+
 // --- httpbin.org tests (gated by environment variable) ---
 
 func TestForwardProxyWithHttpbin(t *testing.T) {

@@ -10,9 +10,13 @@ import (
 type bufferWriter struct {
 	io.Writer
 	http.ResponseWriter
+	safe *safeWriter
 }
 
 func (w *bufferWriter) WriteHeader(code int) {
+	if w.safe != nil && w.safe.failed {
+		return
+	}
 	w.ResponseWriter.WriteHeader(code)
 }
 
@@ -21,6 +25,9 @@ func (w *bufferWriter) Write(b []byte) (int, error) {
 }
 
 func (w *bufferWriter) Flush() {
+	if w.safe != nil && w.safe.failed {
+		return
+	}
 	w.ResponseWriter.(http.Flusher).Flush()
 }
 

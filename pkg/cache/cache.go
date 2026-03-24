@@ -16,6 +16,16 @@ import (
 )
 
 type FileCache interface {
+	// Create a temp file in the cache directory for the given URI, suitable
+	// for streaming writes. Creates parent directories and validates path
+	// traversal. The caller is responsible for closing the returned file.
+	CreateTempWriter(uri string) (*os.File, error)
+
+	// Atomically commit a temp file into the cache by setting its mtime
+	// and renaming it to the final path for the given URI. Trusts that
+	// the URI was already validated by CreateTempWriter.
+	CommitTempFile(tmpPath string, uri string, mtime time.Time) error
+
 	// Remove cached file for given URL
 	DeleteFile(string) error
 
@@ -118,26 +128,55 @@ func (c *cache) IsCached(uri string) bool {
 	return err == nil
 }
 
-// Saves buffer to file
-func (c *cache) SaveToDisk(uri string, buffer *bytes.Buffer, fileTime time.Time) error {
+// CreateTempWriter creates a temporary file in the correct cache subdirectory
+// for the given URI, creating parent directories as needed.
+func (c *cache) CreateTempWriter(uri string) (*os.File, error) {
+	filePath, err := c.resolvedFilePath(uri)
+	if err != nil {
+		return nil, err
+	}
+
+	dir := filepath.Dir(filePath)
+	if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			return nil, err
+		}
+	}
+
+	return os.CreateTemp(dir, "*.tmp")
+}
+
+// CommitTempFile atomically moves a temp file to the final cache path for the
+// given URI and sets the file modification time. It trusts that the URI was
+// already validated by CreateTempWriter.
+func (c *cache) CommitTempFile(tmpPath string, uri string, mtime time.Time) error {
 	filePath, err := c.resolvedFilePath(uri)
 	if err != nil {
 		return err
 	}
 
-	if _, err := os.Stat(filepath.Dir(filePath)); errors.Is(err, os.ErrNotExist) {
-		if err := os.MkdirAll(filepath.Dir(filePath), 0o750); err != nil {
-			return err
-		}
+	info, err := os.Stat(tmpPath)
+	if err != nil {
+		return err
 	}
 
-	tmpFile, err := os.CreateTemp(filepath.Dir(filePath), "*.tmp")
+	if err := os.Chtimes(tmpPath, time.Now().Local(), mtime); err != nil {
+		return err
+	}
+
+	slog.Info("cache write", "path", filePath, "bytes", info.Size())
+	return os.Rename(tmpPath, filePath)
+}
+
+// Saves buffer to file
+func (c *cache) SaveToDisk(uri string, buffer *bytes.Buffer, fileTime time.Time) error {
+	tmpFile, err := c.CreateTempWriter(uri)
 	if err != nil {
 		return err
 	}
 	tmpPath := tmpFile.Name()
 
-	size, err := tmpFile.ReadFrom(buffer)
+	_, err = tmpFile.ReadFrom(buffer)
 	closeErr := tmpFile.Close()
 	if err != nil {
 		_ = os.Remove(tmpPath)
@@ -147,16 +186,8 @@ func (c *cache) SaveToDisk(uri string, buffer *bytes.Buffer, fileTime time.Time)
 		_ = os.Remove(tmpPath)
 		return closeErr
 	}
-	slog.Info("cache write", "path", filePath, "bytes", size)
 
-	// set modified time to given timestamp
-	if err := os.Chtimes(tmpPath, time.Now().Local(), fileTime); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-
-	// atomically move into place so IsCached never observes a partial file
-	if err := os.Rename(tmpPath, filePath); err != nil {
+	if err := c.CommitTempFile(tmpPath, uri, fileTime); err != nil {
 		_ = os.Remove(tmpPath)
 		return err
 	}
