@@ -19,7 +19,7 @@ GO_BUILD_ARGS_EXTRA   :=
 # Vet: https://pkg.go.dev/cmd/vet
 GO_VET_ARGS           :=
 
-GO_TEST_ARGS          := -v -race
+GO_TEST_ARGS          := -v -race -count=1
 GO_TEST_ARGS_EXTRA    :=
 
 # By default build static binaries
