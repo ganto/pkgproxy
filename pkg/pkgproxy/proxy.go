@@ -211,6 +211,9 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 				// Disable prevents writes from error handlers that run
 				// after Cache returns (e.g. the 502 JSON body).
 				rw.Disable()
+				// Close before Remove to avoid leaking file descriptors and
+				// to ensure removal succeeds on all platforms.
+				_ = rw.Close()
 				if tmpPath := rw.TmpPath(); tmpPath != "" {
 					_ = os.Remove(tmpPath)
 				}
