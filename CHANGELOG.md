@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Cache-miss responses are now streamed directly to a temp file on disk instead of being buffered in memory, eliminating memory spikes for large packages
+- `Content-Length` is validated before committing cached files, preventing truncated upstream responses from being cached
+- Client disconnects no longer prevent caching — if a client aborts mid-download, the upstream response is still fully received and cached
 - Landing page snippets for Debian/Ubuntu use `<release>` placeholder instead of hardcoded codenames
 - README client configuration examples updated to current stable releases (Debian trixie, Ubuntu noble)
 

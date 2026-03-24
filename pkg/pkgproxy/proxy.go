@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -82,6 +83,7 @@ var (
 		"Allow",
 		"Content-Encoding",
 		"Content-Language",
+		"Content-Length",
 		"Content-Type",
 		"Cache-Control",
 		"Date",
@@ -150,7 +152,7 @@ func New(config *PkgProxyConfig) PkgProxy {
 func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		var repoCache cache.FileCache
-		var rspBody *bytes.Buffer
+		var rw *resilientWriter
 
 		// the request URI might be changed later, keep the original value
 		uri := strings.Clone(c.Request().RequestURI)
@@ -184,34 +186,70 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 					if c.Request().Method == "DELETE" {
 						return c.JSON(http.StatusNotFound, map[string]string{"message": "Not Found"})
 					}
-					// if not in cache write response body to buffer
-					rspBody = new(bytes.Buffer)
+					// Stream response to both client and cache temp file
+					rw = newResilientWriter(repoCache, uri)
 					if resp, _ := echo.UnwrapResponse(c.Response()); resp != nil {
-						bodyWriter := io.MultiWriter(resp.ResponseWriter, rspBody)
+						sw := newSafeWriter(resp.ResponseWriter)
+						bodyWriter := io.MultiWriter(sw, rw)
 						writer := &bufferWriter{
 							Writer:         bodyWriter,
-							ResponseWriter: resp.ResponseWriter}
+							ResponseWriter: resp.ResponseWriter,
+							safe:           sw,
+						}
 						resp.ResponseWriter = writer
 					}
 				}
 			}
 		}
 
+		// Ensure temp file cleanup runs regardless of next(c) outcome.
+		// The error handler middleware above Cache may write an error response
+		// through the wrapped ResponseWriter after Cache returns, so we need
+		// cleanup even on error paths.
+		if rw != nil {
+			defer func() {
+				// Disable prevents writes from error handlers that run
+				// after Cache returns (e.g. the 502 JSON body).
+				rw.Disable()
+				if tmpPath := rw.TmpPath(); tmpPath != "" {
+					_ = os.Remove(tmpPath)
+				}
+			}()
+		}
+
 		if err := next(c); err != nil {
 			return err
 		}
 
-		if pp.isRepositoryRequest(uri) {
+		if pp.isRepositoryRequest(uri) && rw != nil {
+			// Close temp file before commit or cleanup
+			_ = rw.Close()
+
 			resp, _ := echo.UnwrapResponse(c.Response())
-			if repoCache.IsCacheCandidate(uri) && !repoCache.IsCached(uri) && resp != nil && (resp.Status == 200) && len(rspBody.Bytes()) > 0 {
-				timestamp := time.Now().Local()
-				if c.Response().Header().Get("Last-Modified") != "" {
-					timestamp, _ = http.ParseTime(c.Response().Header().Get("Last-Modified"))
+			if repoCache.IsCacheCandidate(uri) && !repoCache.IsCached(uri) && resp != nil && resp.Status == 200 && rw.bytesWritten > 0 && !rw.failed {
+				// Content-Length validation
+				commitOK := true
+				if clHeader := c.Response().Header().Get("Content-Length"); clHeader != "" {
+					if expectedLen, err := strconv.ParseInt(clHeader, 10, 64); err == nil {
+						if rw.bytesWritten != expectedLen {
+							slog.Warn("cache write skipped: Content-Length mismatch",
+								"request_id", requestID(c), "uri", uri,
+								"expected", expectedLen, "actual", rw.bytesWritten)
+							commitOK = false
+						}
+					}
 				}
-				// save buffer to disk
-				if err := repoCache.SaveToDisk(uri, rspBody, timestamp); err != nil {
-					// don't fail request if we cannot write to cache
-					slog.Error("cache write failed", "request_id", requestID(c), "uri", uri, "error", err)
+
+				if commitOK {
+					timestamp := time.Now().Local()
+					if c.Response().Header().Get("Last-Modified") != "" {
+						timestamp, _ = http.ParseTime(c.Response().Header().Get("Last-Modified"))
+					}
+					// CommitTempFile renames the file; the deferred Remove becomes a harmless ENOENT
+					if err := repoCache.CommitTempFile(rw.TmpPath(), uri, timestamp); err != nil {
+						// don't fail request if we cannot write to cache
+						slog.Error("cache commit failed", "request_id", requestID(c), "uri", uri, "error", err)
+					}
 				}
 			}
 		}
