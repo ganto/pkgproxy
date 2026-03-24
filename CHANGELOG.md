@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/ganto/pkgproxy/commits/HEAD/)
 
+## [v0.1.1](https://github.com/ganto/pkgproxy/releases/tag/v0.1.1) - 2026-03-25
+
 ### Added
 
 - End-to-end tests using real package managers (dnf, apt, pacman) in containers via `make e2e`
