@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -126,6 +127,16 @@ func startServer(_ *cobra.Command, _ []string) error {
 	sc := echo.StartConfig{
 		Address:    fmt.Sprintf("%s:%d", listenAddress, listenPort),
 		HideBanner: true,
+		BeforeServeFunc: func(s *http.Server) error {
+			// Echo v5 defaults WriteTimeout to 30s as Slowloris mitigation
+			// (GoSec G112). WriteTimeout is a hard wall-clock deadline from
+			// request header read to response completion, which cuts off
+			// streaming responses for large package files. If pkgproxy is
+			// exposed directly, use a reverse proxy (e.g. nginx) with
+			// appropriate timeouts for Slowloris protection.
+			s.WriteTimeout = 0
+			return nil
+		},
 	}
 	return sc.Start(ctx, app)
 }
