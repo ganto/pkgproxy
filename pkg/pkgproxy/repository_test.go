@@ -12,6 +12,9 @@ import (
 )
 
 func TestValidateConfigWildcardWithRedundantSuffixes(t *testing.T) {
+	prev := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
 	var buf bytes.Buffer
 	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})
 	logger := slog.New(handler)
@@ -35,6 +38,9 @@ func TestValidateConfigWildcardWithRedundantSuffixes(t *testing.T) {
 }
 
 func TestValidateConfigWildcardAloneNoWarning(t *testing.T) {
+	prev := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
 	var buf bytes.Buffer
 	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})
 	logger := slog.New(handler)
