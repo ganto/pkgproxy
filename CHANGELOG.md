@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/ganto/pkgproxy/commits/HEAD/)
 
+### Added
+
+- Per-repository `exclude` config field to prevent specific filenames or suffixes from being cached
+- Support caching Gentoo distfiles with `suffixes: ["*"]` wildcard and `exclude` list
+- Gentoo e2e test using `emerge --fetchonly` in a `gentoo/stage3` container
+
 ## [v0.1.2](https://github.com/ganto/pkgproxy/releases/tag/v0.1.2) - 2026-03-28
 
 ### Fixed

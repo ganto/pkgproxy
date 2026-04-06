@@ -135,6 +135,13 @@ Can be used for any type of RPM-based enterprise distribution. E.g. `/etc/yum.re
 baseurl=http://<pkgproxy>:8080/epel/$releasever/Everything/$basearch/
 ```
 
+### Gentoo
+
+`/etc/portage/make.conf`:
+```
+GENTOO_MIRRORS="http://<pkgproxy>:8080/gentoo"
+```
+
 ### Fedora
 
 `/etc/yum.repos.d/fedora.repo` (adjust other repositories accordingly):
@@ -193,7 +200,7 @@ Run tests for a specific distribution and release:
 make e2e DISTRO=fedora RELEASE=42
 ```
 
-Supported `DISTRO` values: `fedora`, `centos-stream`, `almalinux`, `rockylinux`, `debian`, `ubuntu`, `archlinux`.
+Supported `DISTRO` values: `fedora`, `centos-stream`, `almalinux`, `rockylinux`, `debian`, `ubuntu`, `archlinux`, `gentoo`.
 
 When adding support for a new Linux distribution, corresponding e2e tests should be added as well.
 

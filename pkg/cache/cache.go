@@ -56,6 +56,9 @@ type CacheConfig struct {
 
 	// List of file suffixes that will be cached
 	FileSuffixes []string
+
+	// List of filenames or suffixes that are never cached
+	Exclude []string
 }
 
 func New(cfg *CacheConfig) FileCache {
@@ -104,17 +107,30 @@ func (c *cache) GetFileSuffixes() []string {
 
 // Verifies if the given file URI is candidate to be cached
 func (c *cache) IsCacheCandidate(uri string) bool {
-	ca := false
-
 	name := utils.FilenameFromURI(uri)
-	for _, suffix := range c.GetFileSuffixes() {
-		if strings.HasSuffix(name, suffix) {
-			ca = true
-			break
+
+	// Exclude check first: exact name match or suffix match.
+	for _, entry := range c.config.Exclude {
+		if name == entry || strings.HasSuffix(name, entry) {
+			return false
 		}
 	}
 
-	return ca
+	// Wildcard: "*" in suffixes means cache everything (that wasn't excluded).
+	for _, suffix := range c.GetFileSuffixes() {
+		if suffix == "*" {
+			return true
+		}
+	}
+
+	// Existing suffix-match logic.
+	for _, suffix := range c.GetFileSuffixes() {
+		if strings.HasSuffix(name, suffix) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Verifies if the file is already cached

@@ -5,6 +5,7 @@ package pkgproxy
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -22,6 +23,7 @@ type RepoConfig struct {
 
 type Repository struct {
 	CacheSuffixes []string `yaml:"suffixes"`
+	Exclude       []string `yaml:"exclude,omitempty"`
 	Mirrors       []string `yaml:"mirrors"`
 	Retries       int      `yaml:"retries,omitempty"`
 }
@@ -61,6 +63,20 @@ func validateConfig(config *RepoConfig) error {
 		}
 		if repoConfig.Mirrors == nil {
 			return fmt.Errorf("missing required key for repository '%s': mirrors", handle)
+		}
+		// Warn if suffixes contains "*" alongside other entries (redundant).
+		hasWildcard := false
+		var redundant []string
+		for _, s := range repoConfig.CacheSuffixes {
+			if s == "*" {
+				hasWildcard = true
+			} else {
+				redundant = append(redundant, s)
+			}
+		}
+		if hasWildcard && len(redundant) > 0 {
+			slog.Warn("repository has wildcard suffix '*' with redundant explicit suffixes",
+				"repository", handle, "redundant_suffixes", redundant)
 		}
 	}
 	return nil

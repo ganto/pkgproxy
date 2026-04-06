@@ -134,6 +134,7 @@ func New(config *PkgProxyConfig) PkgProxy {
 			cache: cache.New(&cache.CacheConfig{
 				BasePath:     config.CacheBasePath,
 				FileSuffixes: config.RepositoryConfig.Repositories[repo].CacheSuffixes,
+				Exclude:      config.RepositoryConfig.Repositories[repo].Exclude,
 			}),
 			mirrors: mirrors,
 			retries: retries,

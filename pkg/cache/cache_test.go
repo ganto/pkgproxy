@@ -187,6 +187,87 @@ func TestCommitTempFile(t *testing.T) {
 	})
 }
 
+func TestIsCacheCandidate(t *testing.T) {
+	tests := []struct {
+		name     string
+		suffixes []string
+		exclude  []string
+		uri      string
+		want     bool
+	}{
+		{
+			name:     "wildcard matches any file",
+			suffixes: []string{"*"},
+			uri:      "/repo/distfiles/ab/somefile.tar.xz",
+			want:     true,
+		},
+		{
+			name:     "exclude exact name blocks caching",
+			suffixes: []string{"*"},
+			exclude:  []string{"layout.conf"},
+			uri:      "/repo/distfiles/layout.conf",
+			want:     false,
+		},
+		{
+			name:     "exclude suffix blocks caching",
+			suffixes: []string{"*"},
+			exclude:  []string{".sig"},
+			uri:      "/repo/distfiles/ab/somefile.tar.xz.sig",
+			want:     false,
+		},
+		{
+			name:     "exclude overrides wildcard",
+			suffixes: []string{"*"},
+			exclude:  []string{"timestamp.mirmon"},
+			uri:      "/repo/distfiles/timestamp.mirmon",
+			want:     false,
+		},
+		{
+			name:     "exclude overrides explicit suffix",
+			suffixes: []string{".rpm"},
+			exclude:  []string{"verylarge.rpm"},
+			uri:      "/repo/verylarge.rpm",
+			want:     false,
+		},
+		{
+			name:     "no exclude field behaves normally",
+			suffixes: []string{".rpm"},
+			uri:      "/repo/package.rpm",
+			want:     true,
+		},
+		{
+			name:     "no exclude field rejects non-matching suffix",
+			suffixes: []string{".rpm"},
+			uri:      "/repo/readme.txt",
+			want:     false,
+		},
+		{
+			name:     "wildcard without exclude matches everything",
+			suffixes: []string{"*"},
+			uri:      "/repo/anything",
+			want:     true,
+		},
+		{
+			name:     "non-matching exclude does not affect caching",
+			suffixes: []string{"*"},
+			exclude:  []string{"layout.conf"},
+			uri:      "/repo/distfiles/ab/somefile.crate",
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := New(&CacheConfig{
+				BasePath:     "/cache",
+				FileSuffixes: tt.suffixes,
+				Exclude:      tt.exclude,
+			})
+			assert.Equal(t, tt.want, c.IsCacheCandidate(tt.uri))
+		})
+	}
+}
+
 func TestSaveToDiskStillWorks(t *testing.T) {
 	baseDir := t.TempDir()
 	c := New(&CacheConfig{BasePath: baseDir})
