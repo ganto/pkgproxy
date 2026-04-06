@@ -34,6 +34,7 @@ pre-commit run codespell --all-files
 - E2e tests must pass before a feature is considered complete.
 - Adding support for a new Linux distribution requires adding corresponding e2e tests.
 - Changes to client config snippets (sources.list, .repo files) must be replicated in the landing page snippets and in README.md.
+- New or changed configuration options (CLI flags, repository config keys) must be documented in README.md.
 
 ## OpenSpec
 

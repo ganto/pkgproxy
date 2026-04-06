@@ -44,7 +44,8 @@ Each repository supports the following options:
 
 | Key | Required | Description |
 |-----|----------|-------------|
-| `suffixes` | yes | File suffixes that are eligible for caching (e.g. `.rpm`, `.deb`) |
+| `suffixes` | yes | File suffixes that are eligible for caching (e.g. `.rpm`, `.deb`). Use `"*"` to cache all files. |
+| `exclude` | no | List of file names to exclude from caching, even when they match a suffix. Useful with the `"*"` wildcard suffix. |
 | `mirrors` | yes | Ordered list of upstream mirror URLs |
 | `retries` | no | Number of attempts per mirror before moving to the next one (default: `1`) |
 
@@ -72,6 +73,29 @@ With `retries: 3`, pkgproxy will attempt each mirror up to 3 times before moving
 on to the next one. An exponential backoff is applied between retry attempts
 (1s, 2s, 4s, ...). Only 5xx (server error) responses trigger a retry — client
 errors like 404 are returned immediately.
+
+### Cache exclusions
+
+When using the wildcard suffix `"*"` to cache all files, certain files (such as
+metadata or timestamps) should not be cached because they change frequently. The
+`exclude` option lets you list file names that will always be fetched from
+upstream, bypassing the cache:
+
+```yaml
+repositories:
+  gentoo:
+    suffixes:
+      - "*"
+    exclude:
+      - layout.conf
+      - timestamp.mirmon
+      - timestamp.dev-local
+    mirrors:
+      - https://distfiles.gentoo.org/
+```
+
+Files whose name matches an entry in the `exclude` list are served directly from
+the upstream mirror without being stored in the local cache.
 
 ## Client Configuration
 
