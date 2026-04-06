@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/ganto/pkgproxy/commits/HEAD/)
 
+## [v0.2.0](https://github.com/ganto/pkgproxy/releases/tag/v0.2.0) - 2026-04-06
+
 ### Added
 
 - Per-repository `exclude` config field to prevent specific filenames or suffixes from being cached
