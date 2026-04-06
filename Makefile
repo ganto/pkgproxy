@@ -107,7 +107,8 @@ $(if $(filter rockylinux,$(1)),TestRockyLinux,\
 $(if $(filter debian,$(1)),TestDebian,\
 $(if $(filter ubuntu,$(1)),TestUbuntu,\
 $(if $(filter archlinux,$(1)),TestArch,\
-$(error Unknown DISTRO: $(1). Use one of: fedora centos-stream almalinux rockylinux debian ubuntu archlinux)))))))))
+$(if $(filter gentoo,$(1)),TestGentoo,\
+$(error Unknown DISTRO: $(1). Use one of: fedora centos-stream almalinux rockylinux debian ubuntu archlinux gentoo))))))))))
 endef
 
 .PHONY: e2e

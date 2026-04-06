@@ -28,7 +28,7 @@ jobs:
   e2e:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: ${{ matrix.timeout || 5 }}
 
     strategy:
       fail-fast: false
@@ -55,6 +55,10 @@ jobs:
           - name: Arch Linux latest
             test: TestArch
             release: latest
+          - name: Gentoo latest
+            test: TestGentoo
+            release: latest
+            timeout: 10
 
     name: ${{ matrix.name }}
 
@@ -71,7 +75,7 @@ jobs:
         env:
           E2E_RELEASE: ${{ matrix.release }}
           CONTAINER_RUNTIME: docker
-        run: go test -tags e2e -v -race -timeout 5m -run ${{ matrix.test }} ./test/e2e/
+        run: go test -tags e2e -v -race -timeout ${{ matrix.timeout || 5 }}m -run ${{ matrix.test }} ./test/e2e/
 
   report-status:
     if: always() && github.event_name == 'workflow_dispatch'

@@ -150,6 +150,22 @@ func runContainer(t *testing.T, image string, mounts []string, cmdArgs []string)
 	require.NoError(t, err, "container command failed")
 }
 
+func assertNotCached(t *testing.T, cacheDir string, repoPrefix string, name string) {
+	t.Helper()
+	var matches []string
+	err := filepath.Walk(filepath.Join(cacheDir, repoPrefix), func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && filepath.Base(path) == name {
+			matches = append(matches, path)
+		}
+		return nil
+	})
+	require.NoError(t, err, "failed to walk %s/%s", cacheDir, repoPrefix)
+	assert.Empty(t, matches, "expected no %s files under %s/%s, but found: %v", name, cacheDir, repoPrefix, matches)
+}
+
 func assertCachedFiles(t *testing.T, cacheDir string, repoPrefix string, suffix string) {
 	t.Helper()
 	var matches []string
@@ -417,4 +433,17 @@ deb http://%s/ubuntu-security  %s-security  main restricted universe multiverse
 		[]string{"bash", "/test-apt.sh", "tree"},
 	)
 	assertCachedFiles(t, cacheDir, "ubuntu", ".deb")
+}
+
+func TestGentoo(t *testing.T) {
+	proxyAddr, cacheDir := setupPkgproxy(t)
+
+	runContainer(t, "docker.io/gentoo/stage3:latest",
+		[]string{
+			filepath.Join(scriptDir(), "test-gentoo.sh") + ":/test-gentoo.sh:ro,z",
+		},
+		[]string{"bash", "/test-gentoo.sh", proxyAddr},
+	)
+	assertCachedFiles(t, cacheDir, "gentoo/distfiles", "")
+	assertNotCached(t, cacheDir, "gentoo", "layout.conf")
 }

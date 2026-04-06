@@ -56,6 +56,17 @@ repositories:
     mirrors:
       - https://mirror.init7.net/fedora/epel/
       - https://dl.fedoraproject.org/pub/epel/
+  gentoo:
+    suffixes:
+      - "*"
+    exclude:
+      - layout.conf
+      - timestamp.mirmon
+      - timestamp.dev-local
+    mirrors:
+      - https://mirror.init7.net/gentoo/
+      - https://pkg.adfinis-on-exoscale.ch/gentoo/
+      - https://distfiles.gentoo.org/
   fedora:
     suffixes:
       - .drpm

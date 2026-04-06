@@ -82,6 +82,9 @@ var snippetFuncs = map[string]func(string) string{
 			"# metalink=https://mirrors.fedoraproject.org/metalink?repo=epel-$releasever&arch=$basearch\n" +
 			"baseurl=http://" + addr + "/epel/$releasever/Everything/$basearch/"
 	},
+	"gentoo": func(addr string) string {
+		return "GENTOO_MIRRORS=\"http://" + addr + "/gentoo\""
+	},
 	"fedora": func(addr string) string {
 		return "[fedora]\n" +
 			"# metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch\n" +
