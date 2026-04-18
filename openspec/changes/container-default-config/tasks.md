@@ -12,7 +12,7 @@
 
 ## 3. Documentation
 
-- [x] 3.1 Update `README.md` "Run the code" section: replace the long podman invocations with `podman run --rm -p 8080:8080 ghcr.io/ganto/pkgproxy` as the primary example; keep a bind-mount override example for users supplying their own config
+- [x] 3.1 Update `README.md` "Run the code" section: replace the long podman invocations with `podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z ghcr.io/ganto/pkgproxy serve --host 0.0.0.0` as the primary example (explicit `--host 0.0.0.0` required because `serve` defaults to `localhost`); keep a bind-mount override example for users supplying their own config
 - [x] 3.2 Verify the flags table in `README.md` still reads correctly (no change to flag defaults themselves)
 - [x] 3.3 Grep `pkg/pkgproxy/landing.go` and landing-page templates for any hard-coded container invocation examples; update if found, otherwise record that none exist
 - [x] 3.4 Add a `[Unreleased]` entry in `CHANGELOG.md` (80–100 chars): e.g. "container image now runs `serve` by default and loads bundled config from `$KO_DATA_PATH`"

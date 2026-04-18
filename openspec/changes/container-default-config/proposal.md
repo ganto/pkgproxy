@@ -1,6 +1,6 @@
 ## Why
 
-Running the published container image today requires users to explicitly pass `serve --host 0.0.0.0 --config /var/run/ko/pkgproxy.yaml` because (a) the root command rejects invocations without a subcommand and (b) the bundled config baked into the image by ko's `kodata` mechanism is not part of the binary's default search path. The advertised "just run the image" workflow therefore never works; every user ends up copying a long command from the README. The goal is `podman run -p 8080:8080 ghcr.io/ganto/pkgproxy` starting a working server out of the box.
+Running the published container image today requires users to explicitly pass `serve --host 0.0.0.0 --config /var/run/ko/pkgproxy.yaml` because (a) the root command rejects invocations without a subcommand and (b) the bundled config baked into the image by ko's `kodata` mechanism is not part of the binary's default search path. The advertised "just run the image" workflow therefore never works; every user ends up copying a long command from the README. The goal is `podman run -p 8080:8080 ghcr.io/ganto/pkgproxy serve --host 0.0.0.0` starting a working server out of the box. (The `--host 0.0.0.0` flag remains required because `serve` defaults to `localhost`, which is unreachable via a container port mapping; changing that default is out of scope for this change.)
 
 ## What Changes
 

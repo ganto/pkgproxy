@@ -10,13 +10,13 @@ Two coupled changes make the image self-contained without introducing a second i
 ## Goals / Non-Goals
 
 **Goals:**
-- `podman run -p 8080:8080 ghcr.io/ganto/pkgproxy` starts a functional proxy using the bundled default config, with no additional flags and no bind mount.
+- `podman run -p 8080:8080 ghcr.io/ganto/pkgproxy serve --host 0.0.0.0` starts a functional proxy using the bundled default config with no bind mount. (Note: `--host` must be supplied explicitly because `serve` defaults to `localhost`; changing that default is out of scope here.)
 - Existing invocation patterns (`pkgproxy serve …`, `pkgproxy version`, `pkgproxy --help`, explicit `--config`, `$PKGPROXY_CONFIG`) continue to behave exactly as today.
 - Local development (`make run`, `go run .`, `bin/pkgproxy serve`) is unaffected.
 - No ko-specific path strings hard-coded anywhere in the Go source. The image-bundled location is discovered via the `KO_DATA_PATH` env var that ko itself sets — if the env var is absent (outside a ko image), the new lookup step is skipped entirely.
 
 **Non-Goals:**
-- Changing the container image's `--host` default, cache directory defaults, or any other server-side defaults.
+- Changing the container image's `--host` default (currently `localhost`; users must pass `--host 0.0.0.0` for port-mapped container access), cache directory defaults, or any other server-side defaults.
 - Replacing ko with a Containerfile or mutating the image after `ko build` (evaluated and rejected — see Decisions).
 - Supporting `/etc/pkgproxy/pkgproxy.yaml` or other FHS-style search paths. Can be added later under a separate proposal if needed.
 - Changing the cache-directory behavior (`--cachedir` defaults to relative `cache`, which resolves under `/ko-app/cache` in the image and silently writes to the overlay FS if no volume is mounted). Acknowledged as a separate rough edge.
