@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/ganto/pkgproxy/commits/HEAD/)
 
+### Added
+
+- Container image now runs `serve` by default and loads bundled config from `$KO_DATA_PATH`
+
 ### Changed
 
 - Upgraded Echo web framework to v5.1.0

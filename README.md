@@ -14,13 +14,13 @@ PKGPROXY_CONFIG=./configs/pkgproxy.yaml go run github.com/ganto/pkgproxy serve
 
 Run the application via a container engine (e.g. [Podman](https://podman.io/)):
 
-- Using the default repository configuration:
 ```shell
-podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z ghcr.io/ganto/pkgproxy serve --host 0.0.0.0 --config /var/run/ko/pkgproxy.yaml
+podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z ghcr.io/ganto/pkgproxy serve --host 0.0.0.0
 ```
-- Mounting your own local `pkgproxy.yaml`:
+
+To use a custom `pkgproxy.yaml`, bind-mount it into the container:
 ```shell
-podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z --volume ./pkgproxy.yaml:/ko-app/pkgproxy.yaml ghcr.io/ganto/pkgproxy serve --host 0.0.0.0 --config /ko-app/pkgproxy.yaml
+podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z --volume ./pkgproxy.yaml:/ko-app/pkgproxy.yaml ghcr.io/ganto/pkgproxy serve --host 0.0.0.0
 ```
 
 ## Server Configuration
