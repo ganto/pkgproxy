@@ -75,6 +75,9 @@ func startServer(_ *cobra.Command, _ []string) error {
 	)
 
 	app := echo.New()
+	// Extract client IP from X-Forwarded-For when running behind a reverse proxy.
+	// Defaults trust loopback/link-local/private-net, which cover typical nginx/caddy deployments.
+	app.IPExtractor = echo.ExtractIPFromXFFHeader()
 
 	app.Use(middleware.RequestID())
 	app.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
