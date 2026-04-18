@@ -77,7 +77,7 @@ func TestResolveConfigPath(t *testing.T) {
 					}
 				}
 			} else {
-				// ensure the env var is absent for this test
+				// empty string is treated as unset by resolveConfigPath
 				t.Setenv(koDataPathEnvVar, "")
 			}
 
