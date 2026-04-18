@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -46,11 +47,36 @@ Complete documentation is available at https://github.com/ganto/pkgproxy`,
 	return c
 }
 
+const koDataPathEnvVar = "KO_DATA_PATH"
+
+// injectServeDefault prepends "serve" to os.Args when the binary is called
+// with no arguments, making the container image work without an explicit subcommand.
+func injectServeDefault() {
+	if len(os.Args) == 1 {
+		os.Args = append([]string{os.Args[0], "serve"}, os.Args[1:]...)
+	}
+}
+
+// resolveConfigPath returns the config file path to use when neither --config
+// nor $PKGPROXY_CONFIG has been set explicitly.
+func resolveConfigPath() string {
+	if _, err := os.Stat(defaultConfigPath); err == nil {
+		return defaultConfigPath
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return defaultConfigPath
+	}
+	if koDataPath, ok := os.LookupEnv(koDataPathEnvVar); ok && koDataPath != "" {
+		return koDataPath + "/pkgproxy.yaml"
+	}
+	return defaultConfigPath
+}
+
 func initConfig() error {
 	if configPath == defaultConfigPath {
-		value, found := os.LookupEnv(configPathEnvVar)
-		if found {
+		if value, found := os.LookupEnv(configPathEnvVar); found {
 			configPath = value
+		} else {
+			configPath = resolveConfigPath()
 		}
 	}
 
@@ -62,6 +88,7 @@ func initConfig() error {
 
 // Execute starts the command
 func Execute() {
+	injectServeDefault()
 	if err := NewRootCommand().Execute(); err != nil {
 		os.Exit(1)
 	}
