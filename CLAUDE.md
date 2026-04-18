@@ -29,7 +29,7 @@ pre-commit run codespell --all-files
 
 - Run `make ci-check` before committing.
 - Do not delete failing tests.
-- Update the `[Unreleased]` section of `CHANGELOG.md` for every user-facing change made to the codebase.
+- Update the `[Unreleased]` section of `CHANGELOG.md` for every user-facing change made to the codebase. Entries must be concise (80–100 characters), written for pkgproxy users, and omit internal implementation details.
 - Before pushing a release tag: rename `[Unreleased]` to `[v<version>] - <date>`, add a new empty `[Unreleased]` section above it, and commit.
 - E2e tests must pass before a feature is considered complete.
 - Adding support for a new Linux distribution requires adding corresponding e2e tests.
