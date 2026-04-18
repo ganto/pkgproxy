@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/ganto/pkgproxy/pkg/pkgproxy"
 	"github.com/spf13/cobra"
@@ -59,16 +60,19 @@ func injectServeDefault() {
 
 // resolveConfigPath returns the config file path to use when neither --config
 // nor $PKGPROXY_CONFIG has been set explicitly.
-func resolveConfigPath() string {
-	if _, err := os.Stat(defaultConfigPath); err == nil {
-		return defaultConfigPath
+func resolveConfigPath() (string, error) {
+	if info, err := os.Stat(defaultConfigPath); err == nil {
+		if info.Mode().IsRegular() {
+			return defaultConfigPath, nil
+		}
+		// not a regular file — fall through to KO_DATA_PATH
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return defaultConfigPath
+		return "", err
 	}
 	if koDataPath, ok := os.LookupEnv(koDataPathEnvVar); ok && koDataPath != "" {
-		return koDataPath + "/pkgproxy.yaml"
+		return filepath.Join(koDataPath, "pkgproxy.yaml"), nil
 	}
-	return defaultConfigPath
+	return defaultConfigPath, nil
 }
 
 func initConfig() error {
@@ -76,7 +80,11 @@ func initConfig() error {
 		if value, found := os.LookupEnv(configPathEnvVar); found {
 			configPath = value
 		} else {
-			configPath = resolveConfigPath()
+			var err error
+			configPath, err = resolveConfigPath()
+			if err != nil {
+				return fmt.Errorf("unable to resolve config path: %w", err)
+			}
 		}
 	}
 

@@ -8,12 +8,23 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+const minimalConfig = "repositories: {}\n"
+
+func writeConfig(t *testing.T, dir, name string) string {
+	t.Helper()
+	p := filepath.Join(dir, name)
+	require.NoError(t, os.WriteFile(p, []byte(minimalConfig), 0600))
+	return p
+}
 
 func TestResolveConfigPath(t *testing.T) {
 	tests := []struct {
 		name         string
 		localExists  bool
+		localIsDir   bool
 		koDataSet    bool
 		koFileExists bool
 		want         func(koDir string) string
@@ -30,7 +41,7 @@ func TestResolveConfigPath(t *testing.T) {
 			localExists:  false,
 			koDataSet:    true,
 			koFileExists: true,
-			want:         func(koDir string) string { return koDir + "/pkgproxy.yaml" },
+			want:         func(koDir string) string { return filepath.Join(koDir, "pkgproxy.yaml") },
 		},
 		{
 			name:        "both missing returns default path",
@@ -43,7 +54,15 @@ func TestResolveConfigPath(t *testing.T) {
 			localExists:  false,
 			koDataSet:    true,
 			koFileExists: false,
-			want:         func(koDir string) string { return koDir + "/pkgproxy.yaml" },
+			want:         func(koDir string) string { return filepath.Join(koDir, "pkgproxy.yaml") },
+		},
+		{
+			name:         "directory named pkgproxy.yaml falls through to ko",
+			localExists:  true,
+			localIsDir:   true,
+			koDataSet:    true,
+			koFileExists: true,
+			want:         func(koDir string) string { return filepath.Join(koDir, "pkgproxy.yaml") },
 		},
 	}
 
@@ -62,9 +81,14 @@ func TestResolveConfigPath(t *testing.T) {
 			t.Cleanup(func() { _ = os.Chdir(origDir) })
 
 			if tt.localExists {
-				err := os.WriteFile(filepath.Join(localDir, "pkgproxy.yaml"), []byte("repos: []\n"), 0600)
-				if err != nil {
-					t.Fatal(err)
+				if tt.localIsDir {
+					if err := os.Mkdir(filepath.Join(localDir, "pkgproxy.yaml"), 0700); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					if err := os.WriteFile(filepath.Join(localDir, "pkgproxy.yaml"), []byte("repos: []\n"), 0600); err != nil {
+						t.Fatal(err)
+					}
 				}
 			}
 
@@ -81,8 +105,64 @@ func TestResolveConfigPath(t *testing.T) {
 				t.Setenv(koDataPathEnvVar, "")
 			}
 
-			got := resolveConfigPath()
+			got, err := resolveConfigPath()
+			assert.NoError(t, err)
 			assert.Equal(t, tt.want(koDir), got)
 		})
 	}
+}
+
+func TestInitConfig(t *testing.T) {
+	t.Run("explicit --config bypasses lookup and env var", func(t *testing.T) {
+		dir := t.TempDir()
+		explicit := writeConfig(t, dir, "explicit.yaml")
+		_ = writeConfig(t, dir, "env.yaml")
+
+		t.Setenv(configPathEnvVar, filepath.Join(dir, "env.yaml"))
+		t.Setenv(koDataPathEnvVar, "")
+
+		configPath = explicit
+		t.Cleanup(func() { configPath = defaultConfigPath })
+
+		require.NoError(t, initConfig())
+		assert.Equal(t, explicit, configPath)
+	})
+
+	t.Run("PKGPROXY_CONFIG bypasses ordered lookup", func(t *testing.T) {
+		dir := t.TempDir()
+		envFile := writeConfig(t, dir, "env.yaml")
+
+		t.Setenv(configPathEnvVar, envFile)
+		t.Setenv(koDataPathEnvVar, "")
+
+		configPath = defaultConfigPath
+		t.Cleanup(func() { configPath = defaultConfigPath })
+
+		require.NoError(t, initConfig())
+		assert.Equal(t, envFile, configPath)
+	})
+
+	t.Run("ordered lookup used when flag and env var unset", func(t *testing.T) {
+		localDir := t.TempDir()
+
+		origDir, err := os.Getwd()
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(localDir))
+		t.Cleanup(func() { _ = os.Chdir(origDir) })
+
+		writeConfig(t, localDir, "pkgproxy.yaml")
+		// unset both env vars so the ordered lookup runs
+		for _, key := range []string{configPathEnvVar, koDataPathEnvVar} {
+			if prev, ok := os.LookupEnv(key); ok {
+				require.NoError(t, os.Unsetenv(key))
+				t.Cleanup(func() { _ = os.Setenv(key, prev) })
+			}
+		}
+
+		configPath = defaultConfigPath
+		t.Cleanup(func() { configPath = defaultConfigPath })
+
+		require.NoError(t, initConfig())
+		assert.Equal(t, defaultConfigPath, configPath)
+	})
 }
