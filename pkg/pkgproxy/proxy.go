@@ -49,12 +49,14 @@ type (
 	}
 )
 
+const httpMethodDelete = "DELETE"
+
 var (
 	// HTTP methods that are allowed for the cache
 	allowedCacheMethods = []string{
 		"GET",
 		"HEAD",
-		"DELETE",
+		httpMethodDelete,
 	}
 
 	// HTTP methods that are allowed for the proxy
@@ -167,7 +169,7 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 			if repoCache.IsCacheCandidate(uri) {
 				if repoCache.IsCached(uri) {
 					// serve or delete from cache
-					if c.Request().Method == "DELETE" {
+					if c.Request().Method == httpMethodDelete {
 						slog.Info("cache delete", "request_id", requestID(c), "uri", uri)
 						if err := repoCache.DeleteFile(uri); err != nil {
 							return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
@@ -184,7 +186,7 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 					}
 					return c.FileFS(filepath.Base(absPath), os.DirFS(filepath.Dir(absPath)))
 				} else {
-					if c.Request().Method == "DELETE" {
+					if c.Request().Method == httpMethodDelete {
 						return c.JSON(http.StatusNotFound, map[string]string{"message": "Not Found"})
 					}
 					// Stream response to both client and cache temp file
