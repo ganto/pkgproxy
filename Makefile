@@ -5,8 +5,6 @@ REVISION ?= $(shell git rev-parse HEAD)
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 ARCHS   ?= $(shell go env GOARCH)
 
-BIN_DIR := bin/
-
 LDFLAGS_PKG           := github.com/ganto/pkgproxy/cmd
 LDFLAGS               := -X $(LDFLAGS_PKG).Version=$(VERSION) -X $(LDFLAGS_PKG).GitCommit=$(REVISION) -X $(LDFLAGS_PKG).BuildDate=$(BUILD_DATE)
 
@@ -15,6 +13,11 @@ GO_INSTALL_ARGS_EXTRA :=
 # Build: https://golang.org/cmd/go/#hdr-Compile_packages_and_dependencies
 GO_BUILD_ARGS         := -a -v -trimpath
 GO_BUILD_ARGS_EXTRA   :=
+
+## Location to install dependencies to
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
 
 # Vet: https://pkg.go.dev/cmd/vet
 GO_VET_ARGS           :=
@@ -48,12 +51,13 @@ help: ## Display this help
 
 ## Format sources files with goimports
 .PHONY: format
+GOIMPORTS_VERSION ?= latest
 format: ## Format source files with `goimports`
 	$(info ****************************************************)
 	$(info ********** EXECUTING 'format' MAKE TARGET **********)
 	$(info ****************************************************)
-	@command -v goimports 2>&1 >/dev/null || go install $(GO_INSTALL_ARGS) $(GO_INSTALL_ARGS_EXTRA) golang.org/x/tools/cmd/goimports@latest
-	goimports -w $(SOURCE)
+	test -s $(LOCALBIN)/goimports || GOBIN=$(LOCALBIN) go install $(GO_INSTALL_ARGS) $(GO_INSTALL_ARGS_EXTRA) golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION)
+	$(LOCALBIN)/goimports -w $(SOURCE)
 
 .PHONY: vet
 vet: ## Run go vet against code
@@ -70,12 +74,13 @@ generate: ## Run code generation (if required)
 	go generate -v ./...
 
 .PHONY: ci-lint
+GOLANGCILINT_VERSION ?= latest
 ci-lint: ## Run all lint related tests against the codebase (will use the .golangci.yml config)
 	$(info *****************************************************)
 	$(info ********** EXECUTING 'ci-lint' MAKE TARGET **********)
 	$(info *****************************************************)
-	@command -v golangci-lint 2>&1 >/dev/null || go install $(GO_INSTALL_ARGS) $(GO_INSTALL_ARGS_EXTRA) github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
-	golangci-lint -v run
+	test -s $(LOCALBIN)/golangci-lint || GOBIN=$(LOCALBIN) go install $(GO_INSTALL_ARGS) $(GO_INSTALL_ARGS_EXTRA) github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCILINT_VERSION)
+	$(LOCALBIN)/golangci-lint -v run
 
 .PHONY: ci-check
 ci-check: ci-lint govulncheck test ## Run various check commands intended for CI use (lint, govulncheck, test, ...)
@@ -88,7 +93,7 @@ lint-fix: ci-lint ## Run golangci-lint linter and perform fixes
 	$(info ******************************************************)
 	$(info ********** EXECUTING 'lint-fix' MAKE TARGET **********)
 	$(info ******************************************************)
-	golangci-lint -v run --fix
+	$(LOCALBIN)/golangci-lint -v run --fix
 
 .PHONY: test
 test: ## Run the tests against the codebase
@@ -127,12 +132,13 @@ coverage: ## Generates test coverage report
 	go test ./... -coverpkg=./... -coverprofile=coverage.out
 
 .PHONY: govulncheck
+GOVULNCHECK_VERSION ?= latest
 govulncheck: ## Run Go vulnerability check
 	$(info *********************************************************)
 	$(info ********** EXECUTING 'govulncheck' MAKE TARGET **********)
 	$(info *********************************************************)
-	@command -v govulncheck 2>&1 >/dev/null || go install $(GO_INSTALL_ARGS) $(GO_INSTALL_ARGS_EXTRA) golang.org/x/vuln/cmd/govulncheck@latest
-	govulncheck -show verbose ./... || true
+	test -s $(LOCALBIN)/govulncheck || GOBIN=$(LOCALBIN) go install $(GO_INSTALL_ARGS) $(GO_INSTALL_ARGS_EXTRA) golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
+	$(LOCALBIN)/govulncheck -show verbose ./... || true
 
 ##@ Build
 
@@ -144,7 +150,7 @@ ci-build: ## To be called to build the application binary in a CI pipeline
 	$(info ******************************************************)
 	$(info ********** EXECUTING 'ci-build' MAKE TARGET **********)
 	$(info ******************************************************)
-	CGO_ENABLED=$(CGO_ENABLED) go build $(GO_BUILD_ARGS) $(GO_BUILD_ARGS_EXTRA) -ldflags '$(LDFLAGS)' -o $(BIN_DIR)$(NAME) .
+	CGO_ENABLED=$(CGO_ENABLED) go build $(GO_BUILD_ARGS) $(GO_BUILD_ARGS_EXTRA) -ldflags '$(LDFLAGS)' -o $(LOCALBIN)$(NAME) .
 
 .PHONY: run
 run: format vet generate ## Run the application from your host
@@ -195,7 +201,7 @@ clean: ## Cleanup binary
 	$(info ***************************************************)
 	$(info ********** EXECUTING 'clean' MAKE TARGET **********)
 	$(info ***************************************************)
-	rm -rvf $(BIN_DIR) image-ref.out
+	rm -rvf $(LOCALBIN) image-ref.out
 
 .PHONY: all
 all: format vet lint govulncheck test build
