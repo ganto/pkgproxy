@@ -49,12 +49,15 @@ type (
 	}
 )
 
+const httpMethodDelete = "DELETE"
+const jsonKeyMessage = "message"
+
 var (
 	// HTTP methods that are allowed for the cache
 	allowedCacheMethods = []string{
 		"GET",
 		"HEAD",
-		"DELETE",
+		httpMethodDelete,
 	}
 
 	// HTTP methods that are allowed for the proxy
@@ -160,32 +163,32 @@ func (pp *pkgProxy) Cache(next echo.HandlerFunc) echo.HandlerFunc {
 
 		if pp.isRepositoryRequest(uri) {
 			if !utils.Contains(allowedCacheMethods, c.Request().Method) {
-				return c.JSON(http.StatusMethodNotAllowed, map[string]string{"message": fmt.Sprintf("Cache does not allow method %s\n", c.Request().Method)})
+				return c.JSON(http.StatusMethodNotAllowed, map[string]string{jsonKeyMessage: fmt.Sprintf("Cache does not allow method %s\n", c.Request().Method)})
 			}
 			repoCache = pp.upstreams[getRepoFromURI(uri)].cache
 
 			if repoCache.IsCacheCandidate(uri) {
 				if repoCache.IsCached(uri) {
 					// serve or delete from cache
-					if c.Request().Method == "DELETE" {
+					if c.Request().Method == httpMethodDelete {
 						slog.Info("cache delete", "request_id", requestID(c), "uri", uri)
 						if err := repoCache.DeleteFile(uri); err != nil {
-							return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
+							return c.JSON(http.StatusInternalServerError, map[string]string{jsonKeyMessage: err.Error()})
 						}
-						return c.JSON(http.StatusOK, map[string]string{"message": "Success"})
+						return c.JSON(http.StatusOK, map[string]string{jsonKeyMessage: "Success"})
 					}
 					filePath, err := repoCache.GetFilePath(uri)
 					if err != nil {
-						return c.JSON(http.StatusForbidden, map[string]string{"message": "Forbidden"})
+						return c.JSON(http.StatusForbidden, map[string]string{jsonKeyMessage: "Forbidden"})
 					}
 					absPath, err := filepath.Abs(filePath)
 					if err != nil {
-						return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
+						return c.JSON(http.StatusInternalServerError, map[string]string{jsonKeyMessage: err.Error()})
 					}
 					return c.FileFS(filepath.Base(absPath), os.DirFS(filepath.Dir(absPath)))
 				} else {
-					if c.Request().Method == "DELETE" {
-						return c.JSON(http.StatusNotFound, map[string]string{"message": "Not Found"})
+					if c.Request().Method == httpMethodDelete {
+						return c.JSON(http.StatusNotFound, map[string]string{jsonKeyMessage: "Not Found"})
 					}
 					// Stream response to both client and cache temp file
 					rw = newResilientWriter(repoCache, uri)
@@ -277,7 +280,7 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		if !utils.Contains(allowedProxyMethods, c.Request().Method) {
-			return c.JSON(http.StatusMethodNotAllowed, map[string]string{"message": fmt.Sprintf("Forward proxy does not allow method %s\n", c.Request().Method)})
+			return c.JSON(http.StatusMethodNotAllowed, map[string]string{jsonKeyMessage: fmt.Sprintf("Forward proxy does not allow method %s\n", c.Request().Method)})
 		}
 
 		// Buffer the request body once so it can be replayed across mirror retries and redirects.
