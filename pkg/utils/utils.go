@@ -3,10 +3,9 @@
 package utils
 
 import (
+	"cmp"
 	"sort"
 	"strings"
-
-	"golang.org/x/exp/constraints"
 )
 
 // Contains checks if slice contains element
@@ -20,7 +19,7 @@ func Contains[T comparable](s []T, e T) bool {
 }
 
 // KeysFromMap returns a list of the keys of a map
-func KeysFromMap[T constraints.Ordered, S any](a map[T]S) []T {
+func KeysFromMap[T cmp.Ordered, S any](a map[T]S) []T {
 	keys := make([]T, len(a))
 
 	i := 0
