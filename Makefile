@@ -150,7 +150,7 @@ ci-build: ## To be called to build the application binary in a CI pipeline
 	$(info ******************************************************)
 	$(info ********** EXECUTING 'ci-build' MAKE TARGET **********)
 	$(info ******************************************************)
-	CGO_ENABLED=$(CGO_ENABLED) go build $(GO_BUILD_ARGS) $(GO_BUILD_ARGS_EXTRA) -ldflags '$(LDFLAGS)' -o $(LOCALBIN)$(NAME) .
+	CGO_ENABLED=$(CGO_ENABLED) go build $(GO_BUILD_ARGS) $(GO_BUILD_ARGS_EXTRA) -ldflags '$(LDFLAGS)' -o $(LOCALBIN)/$(NAME) .
 
 .PHONY: run
 run: format vet generate ## Run the application from your host
