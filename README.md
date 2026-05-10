@@ -15,12 +15,12 @@ PKGPROXY_CONFIG=./configs/pkgproxy.yaml go run github.com/ganto/pkgproxy serve
 Run the application via a container engine (e.g. [Podman](https://podman.io/)):
 
 ```shell
-podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z ghcr.io/ganto/pkgproxy serve --host 0.0.0.0
+podman run --rm -p 8080:8080 -e PKGPROXY_HOST=0.0.0.0 --volume ./cache:/ko-app/cache:z ghcr.io/ganto/pkgproxy
 ```
 
 To use a custom `pkgproxy.yaml`, bind-mount it into the container:
 ```shell
-podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z --volume ./pkgproxy.yaml:/ko-app/pkgproxy.yaml ghcr.io/ganto/pkgproxy serve --host 0.0.0.0
+podman run --rm -p 8080:8080 -e PKGPROXY_HOST=0.0.0.0 --volume ./cache:/ko-app/cache:z --volume ./pkgproxy.yaml:/ko-app/pkgproxy.yaml ghcr.io/ganto/pkgproxy
 ```
 
 ## Server Configuration
@@ -31,10 +31,12 @@ podman run --rm -p 8080:8080 --volume ./cache:/ko-app/cache:z --volume ./pkgprox
 |------|--------------|---------|-------------|
 | `--config, -c` | `PKGPROXY_CONFIG` | `./pkgproxy.yaml` | Path to the repository config file |
 | `--cachedir` | | `cache` | Path to the local cache directory |
-| `--host` | | `localhost` | Listen address |
+| `--host` | `PKGPROXY_HOST` | `localhost` | Listen address |
 | `--port` | | `8080` | Listen port |
 | `--public-host` | `PKGPROXY_PUBLIC_HOST` | | Public hostname (or `host:port`) shown in landing page config snippets. When set, the listen port is not appended. Useful when running behind a reverse proxy. |
 | `--debug` | | `false` | Enable debug logging |
+
+Any flag with an env variable listed above can be set via the environment instead of passing the flag.
 
 ## Repository Configuration
 

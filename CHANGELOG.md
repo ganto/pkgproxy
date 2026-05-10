@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `PKGPROXY_HOST` env var to set the listen address without passing `--host` on the command line
 - Container image now runs `serve` by default and loads bundled config from `$KO_DATA_PATH`
 
 ### Changed
