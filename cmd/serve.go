@@ -27,6 +27,7 @@ var (
 const (
 	defaultAddress   = "localhost"
 	defaultPort      = 8080
+	hostEnvVar       = "PKGPROXY_HOST"
 	publicHostEnvVar = "PKGPROXY_PUBLIC_HOST"
 )
 
@@ -35,7 +36,8 @@ func newServeCommand() *cobra.Command {
 		Use:   "serve",
 		Args:  cobra.ArbitraryArgs,
 		Short: "Start forward proxy",
-		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			listenAddress = resolveListenHost(cmd.Flag("host").Changed, listenAddress, os.Getenv(hostEnvVar))
 			return initConfig()
 		},
 		RunE:             startServer,
@@ -46,6 +48,17 @@ func newServeCommand() *cobra.Command {
 	c.PersistentFlags().StringVar(&publicHost, "public-host", "", "public hostname (or host:port) shown in landing page config snippets; overrides PKGPROXY_PUBLIC_HOST.")
 
 	return c
+}
+
+// resolveListenHost determines the listen host using flag → env var → default precedence.
+func resolveListenHost(flagChanged bool, flagValue, envValue string) string {
+	if flagChanged {
+		return flagValue
+	}
+	if envValue != "" {
+		return envValue
+	}
+	return defaultAddress
 }
 
 // resolvePublicAddr determines the address rendered in landing page config snippets.
