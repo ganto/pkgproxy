@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ganto/pkgproxy/pkg/pkgproxy"
 	"github.com/spf13/cobra"
@@ -59,29 +60,40 @@ func injectServeDefault() {
 }
 
 // resolveConfigPath returns the config file path to use when neither --config
-// nor $PKGPROXY_CONFIG has been set explicitly.
-func resolveConfigPath() (string, error) {
+// nor $PKGPROXY_CONFIG has been set explicitly, along with the ordered list of
+// candidate paths it considered.
+func resolveConfigPath() (string, []string, error) {
+	candidates := []string{defaultConfigPath}
+
 	if info, err := os.Stat(defaultConfigPath); err == nil {
 		if info.Mode().IsRegular() {
-			return defaultConfigPath, nil
+			return defaultConfigPath, candidates, nil
 		}
 		// not a regular file — fall through to KO_DATA_PATH
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return "", err
+		return "", candidates, err
 	}
+
 	if koDataPath, ok := os.LookupEnv(koDataPathEnvVar); ok && koDataPath != "" {
-		return filepath.Join(koDataPath, "pkgproxy.yaml"), nil
+		koPath := filepath.Join(koDataPath, "pkgproxy.yaml")
+		candidates = append(candidates, koPath)
+		if info, err := os.Stat(koPath); err == nil && info.Mode().IsRegular() {
+			return koPath, candidates, nil
+		}
 	}
-	return defaultConfigPath, nil
+
+	return defaultConfigPath, candidates, nil
 }
 
 func initConfig() error {
+	var candidates []string
+
 	if configPath == defaultConfigPath {
 		if value, found := os.LookupEnv(configPathEnvVar); found {
 			configPath = value
 		} else {
 			var err error
-			configPath, err = resolveConfigPath()
+			configPath, candidates, err = resolveConfigPath()
 			if err != nil {
 				return fmt.Errorf("unable to resolve config path: %w", err)
 			}
@@ -89,6 +101,9 @@ func initConfig() error {
 	}
 
 	if err := pkgproxy.LoadConfig(&repoConfig, configPath); err != nil {
+		if candidates != nil {
+			return fmt.Errorf("unable to load configuration; tried: %s: %w", strings.Join(candidates, ", "), err)
+		}
 		return fmt.Errorf("unable to load configuration from %s: %w", configPath, err)
 	}
 	return nil

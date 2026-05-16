@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Config-file errors now list all default paths attempted, not just the last one
 - Upgraded Echo web framework to v5.1.0
 
 ## [v0.2.0](https://github.com/ganto/pkgproxy/releases/tag/v0.2.0) - 2026-04-06
