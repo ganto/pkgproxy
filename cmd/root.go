@@ -77,8 +77,12 @@ func resolveConfigPath() (string, []string, error) {
 	if koDataPath, ok := os.LookupEnv(koDataPathEnvVar); ok && koDataPath != "" {
 		koPath := filepath.Join(koDataPath, "pkgproxy.yaml")
 		candidates = append(candidates, koPath)
-		if info, err := os.Stat(koPath); err == nil && info.Mode().IsRegular() {
-			return koPath, candidates, nil
+		if info, err := os.Stat(koPath); err == nil {
+			if info.Mode().IsRegular() {
+				return koPath, candidates, nil
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return "", candidates, err
 		}
 	}
 

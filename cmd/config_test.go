@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -124,6 +125,27 @@ func TestResolveConfigPath(t *testing.T) {
 			assert.Equal(t, tt.wantCandidates(koDir), gotCandidates)
 		})
 	}
+}
+
+func TestResolveConfigPathKoStatError(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("permission test cannot run as root")
+	}
+	localDir := t.TempDir()
+	koDir := t.TempDir()
+	require.NoError(t, os.Chmod(koDir, 0))
+	t.Cleanup(func() { _ = os.Chmod(koDir, 0700) })
+
+	origDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(localDir))
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+
+	t.Setenv(koDataPathEnvVar, koDir)
+
+	_, _, err = resolveConfigPath()
+	require.Error(t, err)
+	assert.False(t, errors.Is(err, os.ErrNotExist))
 }
 
 func TestInitConfig(t *testing.T) {
