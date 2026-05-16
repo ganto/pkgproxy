@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: `serve` is dispatched when the binary is invoked with no arguments
-The pkgproxy CLI SHALL dispatch the `serve` subcommand when the binary is invoked with no user-supplied arguments (i.e. `len(os.Args) == 1`). The dispatch SHALL be implemented as a pre-Cobra shim that prepends the literal string `"serve"` to `os.Args` before `cobra.Command.Execute()` is called. Any other invocation form SHALL be passed to Cobra unchanged; in particular, invocations that include at least one argument (whether a subcommand, a flag, or a positional value) SHALL retain their current behavior, including the `MinimumNArgs(1)` error when a flag appears without a subcommand.
+When the binary is invoked with no user-supplied arguments (i.e. `len(os.Args) == 1`), the CLI SHALL pass the literal argument list `["serve"]` to Cobra so that the `serve` subcommand is dispatched as if it had been typed on the command line. The process-global `os.Args` SHALL NOT be mutated. Any other invocation form SHALL be passed to Cobra unchanged; in particular, invocations that include at least one argument (whether a subcommand, a flag, or a positional value) SHALL retain their current behavior, including the `MinimumNArgs(1)` error when a flag appears without a subcommand.
 
 #### Scenario: Container start with no arguments runs serve
 - **WHEN** the binary is executed with `os.Args == ["pkgproxy"]` (e.g. `podman run ghcr.io/ganto/pkgproxy`)

@@ -34,9 +34,27 @@ podman run --rm -p 8080:8080 -e PKGPROXY_HOST=0.0.0.0 --volume ./cache:/ko-app/c
 | `--host` | `PKGPROXY_HOST` | `localhost` | Listen address |
 | `--port` | | `8080` | Listen port |
 | `--public-host` | `PKGPROXY_PUBLIC_HOST` | | Public hostname (or `host:port`) shown in landing page config snippets. When set, the listen port is not appended. Useful when running behind a reverse proxy. |
+| `--trust-proxy` | `PKGPROXY_TRUST_PROXY` | | Comma-separated list of trusted proxy sources for X-Forwarded-For. Accepted values: `none`, `loopback`, `private`, a CIDR (e.g. `10.0.0.0/8`), or a bare IP (promoted to `/32`/`/128`). Unset or empty means no XFF trust. |
 | `--debug` | | `false` | Enable debug logging |
 
 Any flag with an env variable listed above can be set via the environment instead of passing the flag.
+
+### Trusting X-Forwarded-For
+
+By default pkgproxy ignores the `X-Forwarded-For` header and uses the direct connecting IP address for the `remote_ip` access-log field. This is the safe behavior when pkgproxy faces the internet directly or runs in a container without a reverse proxy in front of it.
+
+When pkgproxy runs behind a trusted reverse proxy, set `--trust-proxy` to tell it which source addresses are allowed to supply the client IP via `X-Forwarded-For`. Only the explicitly listed sources are trusted — echo's built-in defaults (loopback/link-local/private) are never applied automatically.
+
+Common recipes:
+
+| Topology | Setting |
+|----------|---------|
+| Same-host reverse proxy (nginx/caddy on localhost) | `PKGPROXY_TRUST_PROXY=loopback` |
+| LAN reverse proxy (specific host, tightest control) | `PKGPROXY_TRUST_PROXY=192.168.1.1/32` |
+| LAN reverse proxy (any private-range host) | `PKGPROXY_TRUST_PROXY=private` |
+| No reverse proxy | Leave unset (default) |
+
+> **Container-bridge caveat:** In a typical `podman run -p 8080:8080` deployment the direct peer is the bridge gateway (e.g. `172.17.0.1`), which falls inside the private range. Setting `PKGPROXY_TRUST_PROXY=private` in that case means any client can inject an arbitrary `X-Forwarded-For` value. Prefer a specific CIDR or IP for tightest control.
 
 ## Repository Configuration
 
