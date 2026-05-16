@@ -228,6 +228,20 @@ func TestParseTrustProxy(t *testing.T) {
 			wantIP:     "203.0.113.5",
 		},
 		{
+			name:       "duplicate none is treated as none",
+			value:      "none,none",
+			remoteAddr: "127.0.0.1:1234",
+			xff:        "1.2.3.4",
+			wantIP:     "127.0.0.1",
+		},
+		{
+			name:       "duplicate IP entries are deduplicated",
+			value:      "192.168.1.10,192.168.1.10",
+			remoteAddr: "192.168.1.10:1234",
+			xff:        "203.0.113.5",
+			wantIP:     "203.0.113.5",
+		},
+		{
 			name:    "none combined with other keyword causes error",
 			value:   "none,loopback",
 			wantErr: "cannot be combined",

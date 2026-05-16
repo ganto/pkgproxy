@@ -112,6 +112,8 @@ func parseTrustProxy(value string) (echo.IPExtractor, error) {
 			entries = append(entries, p)
 		}
 	}
+	slices.Sort(entries)
+	entries = slices.Compact(entries)
 	if len(entries) == 0 {
 		return echo.ExtractIPDirect(), nil
 	}
