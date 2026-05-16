@@ -51,12 +51,13 @@ Complete documentation is available at https://github.com/ganto/pkgproxy`,
 
 const koDataPathEnvVar = "KO_DATA_PATH"
 
-// injectServeDefault prepends "serve" to os.Args when the binary is called
-// with no arguments, making the container image work without an explicit subcommand.
-func injectServeDefault() {
-	if len(os.Args) == 1 {
-		os.Args = append([]string{os.Args[0], "serve"}, os.Args[1:]...)
+// defaultArgs returns the cobra argument list for the current invocation,
+// substituting "serve" when the binary was invoked with no user-supplied arguments.
+func defaultArgs(osArgs []string) []string {
+	if len(osArgs) <= 1 {
+		return []string{"serve"}
 	}
+	return osArgs[1:]
 }
 
 // resolveConfigPath returns the config file path to use when neither --config
@@ -115,8 +116,9 @@ func initConfig() error {
 
 // Execute starts the command
 func Execute() {
-	injectServeDefault()
-	if err := NewRootCommand().Execute(); err != nil {
+	c := NewRootCommand()
+	c.SetArgs(defaultArgs(os.Args))
+	if err := c.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
