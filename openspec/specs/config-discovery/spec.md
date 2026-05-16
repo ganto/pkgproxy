@@ -1,4 +1,4 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Repository configuration is discovered via an ordered lookup
 When neither the `--config`/`-c` flag nor the `PKGPROXY_CONFIG` environment variable is set, the CLI SHALL resolve the repository configuration file by trying the following paths in order and using the first one that exists as a regular readable file:
@@ -6,7 +6,7 @@ When neither the `--config`/`-c` flag nor the `PKGPROXY_CONFIG` environment vari
 1. `./pkgproxy.yaml` (relative to the process working directory)
 2. `$KO_DATA_PATH/pkgproxy.yaml` — only attempted if the `KO_DATA_PATH` environment variable is set to a non-empty value
 
-If neither path yields a readable file, the CLI SHALL fail with the existing "unable to load configuration from ..." error, naming the last path that was attempted.
+If neither path yields a readable file, the CLI SHALL fail with an error that enumerates every candidate path that was attempted, in the order it tried them, of the form `unable to load configuration; tried: <path1>, <path2>: <underlying error>`. When the `$KO_DATA_PATH` candidate is attempted but no `pkgproxy.yaml` exists under it, the resolver SHALL fall through to the local default path as the path that is finally passed to the loader, while still recording the `$KO_DATA_PATH` candidate in the enumerated error.
 
 Explicit user input SHALL always take precedence over the ordered lookup: when `--config`/`-c` is passed with a value other than the built-in default, or when `PKGPROXY_CONFIG` is set, that path is used directly and the ordered lookup is not consulted.
 
@@ -33,8 +33,9 @@ Explicit user input SHALL always take precedence over the ordered lookup: when `
 
 #### Scenario: All default paths missing produces a clear error
 - **WHEN** the binary is started with no `--config` flag, no `PKGPROXY_CONFIG` env var, `./pkgproxy.yaml` absent, and `KO_DATA_PATH` unset
-- **THEN** the CLI SHALL exit with an error of the form `unable to load configuration from ./pkgproxy.yaml: ...`
+- **THEN** the CLI SHALL exit with an error of the form `unable to load configuration; tried: ./pkgproxy.yaml: <underlying error>`
 
 #### Scenario: `KO_DATA_PATH` set but no file present
 - **WHEN** the binary is started with no `--config` flag, no `PKGPROXY_CONFIG` env var, `./pkgproxy.yaml` absent, and `KO_DATA_PATH` set to a directory that does not contain `pkgproxy.yaml`
-- **THEN** the CLI SHALL exit with an error naming `$KO_DATA_PATH/pkgproxy.yaml` as the path it attempted to load
+- **THEN** the CLI SHALL exit with an error of the form `unable to load configuration; tried: ./pkgproxy.yaml, $KO_DATA_PATH/pkgproxy.yaml: <underlying error>` (with the expanded `$KO_DATA_PATH` value)
+- **AND** the path that was finally passed to the configuration loader SHALL be `./pkgproxy.yaml`, not the joined `$KO_DATA_PATH/pkgproxy.yaml`
