@@ -9,7 +9,7 @@
 - When the flag is unset, empty, or set to `none`, the server SHALL install `echo.ExtractIPDirect()` — the `X-Forwarded-For` header is ignored entirely.
 - When the flag carries any other valid value, the server SHALL install `echo.ExtractIPFromXFFHeader(...)` configured with **only** the operator-supplied trust options. Echo's implicit defaults (loopback / link-local / private) SHALL NOT apply.
 - Mixing `none` with any other entry SHALL be an error at startup.
-- Invalid entries (unrecognized keyword, malformed CIDR, unparseable IP) SHALL fail startup with a clear error naming the offending token.
+- Invalid entries (unrecognized keyword, malformed CIDR, unparsable IP) SHALL fail startup with a clear error naming the offending token.
 - The resolved trust mode SHALL be logged once at startup so operators can confirm what was applied.
 - **BREAKING**: Deployments that today rely on echo's implicit private-net trust to populate `remote_ip` from `X-Forwarded-For` will see that field switch to the direct connecting peer until they set `PKGPROXY_TRUST_PROXY` (commonly `private` for LAN reverse proxies, `loopback` for same-host reverse proxies, or a specific CIDR for tightest control).
 
