@@ -18,12 +18,14 @@ jobs:
     steps:
       - name: Set pending e2e status
         run: |
-          gh api "repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }}" \
+          gh api "repos/${REPO}/statuses/${HEAD_SHA}" \
             -f state="pending" \
             -f context="e2e" \
             -f description="E2E tests must be triggered manually via workflow_dispatch"
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
   e2e:
     if: github.event_name == 'workflow_dispatch'
