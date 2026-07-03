@@ -1,6 +1,20 @@
 ---
 name: E2E Tests
 
+# Trigger design (intentional — do not "fix" by running e2e on PR events):
+#
+# The e2e matrix is slow, so it must not run on every push to a PR. It runs
+# once per PR, via manual workflow_dispatch by a maintainer, when the PR is
+# ready to merge.
+#
+# To gate merging on that manual run, every PR event sets the "e2e" commit
+# status to pending (set-pending job), and the dispatched run reports the
+# result back (report-status job) so the merge check can pass.
+#
+# pull_request_target is only used because posting a commit status requires
+# a write-capable GITHUB_TOKEN, also for fork PRs. Since that token is
+# privileged, the set-pending job must never check out or execute PR code.
+
 on:
   workflow_dispatch:
   pull_request_target:
