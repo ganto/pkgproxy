@@ -7,14 +7,14 @@ on:
   pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pull-requests: read  # for golangci/golangci-lint-action to fetch pull requests
+permissions: {}
 
 jobs:
 
   pre-commit:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # for actions/checkout to fetch code
     steps:
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -30,6 +30,9 @@ jobs:
 
   actionlint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # for actions/checkout to fetch code
+      checks: write   # for reviewdog github-pr-check reporter to report findings
     steps:
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -40,6 +43,8 @@ jobs:
 
   golangci-lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # for actions/checkout to fetch code
     steps:
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -58,6 +63,8 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # for actions/checkout to fetch code
     steps:
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7

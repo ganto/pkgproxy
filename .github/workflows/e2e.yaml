@@ -5,9 +5,7 @@ on:
   workflow_dispatch:
   pull_request_target:
 
-permissions:
-  contents: read
-  statuses: write
+permissions: {}
 
 jobs:
 
@@ -15,6 +13,8 @@ jobs:
     if: github.event_name == 'pull_request_target'
     runs-on: ubuntu-latest
     name: Set pending e2e status
+    permissions:
+      statuses: write  # for gh api to set the commit status
     steps:
       - name: Set pending e2e status
         run: |
@@ -30,6 +30,8 @@ jobs:
   e2e:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # for actions/checkout to fetch code
     timeout-minutes: ${{ matrix.timeout || 5 }}
 
     strategy:
@@ -86,6 +88,8 @@ jobs:
     needs: [e2e]
     runs-on: ubuntu-latest
     name: Report e2e status
+    permissions:
+      statuses: write  # for gh api to set the commit status
     steps:
       - name: Report e2e status
         run: |
