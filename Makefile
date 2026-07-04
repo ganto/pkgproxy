@@ -166,6 +166,9 @@ image-build: ## Build container image with ko
 	$(info ***********************************************************)
 	$(info ********** EXECUTING 'image-build' MAKE TARGET ************)
 	$(info ***********************************************************)
+	trap 'rm -f kodata/pkgproxy.yaml' EXIT; \
+	mkdir -p kodata; \
+	cp configs/pkgproxy.yaml kodata/pkgproxy.yaml; \
 	KO_DOCKER_REPO=$${KO_DOCKER_REPO:-ko.local} \
 	KO_DATA_DATE_EPOCH=$$(git log -1 --format='%ct') \
 	VERSION=$(VERSION) \
