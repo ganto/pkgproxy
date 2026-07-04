@@ -2,6 +2,7 @@
 /bin/
 /cache/
 image-ref.out
+/kodata/pkgproxy.yaml
 
 # local openspec setup
 package.json
