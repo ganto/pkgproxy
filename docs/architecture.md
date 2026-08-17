@@ -16,14 +16,22 @@ The **first path segment** of the URL is the repository name (e.g. `/fedora/...`
 
 ## Key Types
 
-- `pkgProxy` (`pkg/pkgproxy/proxy.go`) — holds `upstreams` map (repo name → mirrors + cache instance), `transport`, and `retryBaseDelay`. The `PkgProxy` interface exposes only `Cache` and `ForwardProxy` middleware funcs.
-- `upstream` — per-repository struct bundling a `FileCache`, a list of parsed mirror `*url.URL`s, and the retry count.
+- `pkgProxy` (`pkg/pkgproxy/proxy.go`) — holds `upstreams` map (repo name → targets + cache instance), `transport`, and `retryBaseDelay`. The `PkgProxy` interface exposes only `Cache` and `ForwardProxy` middleware funcs. `New` returns an error, so misconfiguration (notably an unloadable mTLS key pair) aborts startup instead of failing per request.
+- `upstream` — per-repository struct bundling a `FileCache`, the parsed upstream `targets` (`*url.URL`), an optional repository-scoped `transport`, and the retry count.
 - `FileCache` (`pkg/cache/cache.go`) — interface backed by a filesystem cache. Uses atomic write (temp file + `os.Rename`) to prevent partial reads. Path traversal is prevented in `resolvedFilePath`.
-- `RepoConfig` / `Repository` (`pkg/pkgproxy/repository.go`) — YAML-loaded config: each repository has `mirrors`, `suffixes` (cache candidates), and optional `retries`.
+- `RepoConfig` / `Repository` (`pkg/pkgproxy/repository.go`) — YAML-loaded config: each repository has `suffixes` (cache candidates), exactly one of `mirrors` or `cdn`, and optional `mtls` and `retries`.
 
-## Mirror Failover & Retry (`tryMirrors`)
+## Upstream Kinds
 
-Mirrors are tried in order. Per mirror, up to `retries` attempts are made (default 1). Exponential backoff (`retryBaseDelay * 2^(attempt-2)`, starting at 1 s) is triggered only on 5xx responses. A single redirect (301/302/303/307/308) is followed per attempt. Connection-level errors skip immediately to the next mirror. The first 200 response wins; otherwise the last non-nil response is returned.
+A repository is backed either by an ordered list of `mirrors` or by a single `cdn`; the two are mutually exclusive and validated at config load. Both are normalized into the same `targets` slice, so failover, retry, redirect handling and path mapping are one code path.
+
+A `cdn` may carry an `mtls` block. `New` loads the key pair and clones the proxy-wide `*http.Transport`, adding the client certificate to the clone's `TLSClientConfig`. An optional `mtls.ca` is appended to the system trust store (or to the base transport's existing `RootCAs`) so CDNs signed by a private CA — such as `cdn.redhat.com` — verify. The clone is stored on the `upstream`, which scopes both the credential and the extra trust to that one repository; `transportFor` falls back to the shared transport for everything else. Cloning preserves proxy env vars and timeouts.
+
+## Mirror Failover & Retry (`tryUpstreams`)
+
+Upstream targets are tried in order. Per target, up to `retries` attempts are made (default 1). Exponential backoff (`retryBaseDelay * 2^(attempt-2)`, starting at 1 s) is triggered only on 5xx responses. A single redirect (301/302/303/307/308) is followed per attempt. Connection-level errors skip immediately to the next target. The first 200 response wins; otherwise the last non-nil response is returned.
+
+When a repository uses a repository-scoped (mTLS) transport and the redirect points at a different host, the redirect is followed with the shared transport instead, so the client certificate is never presented to a host other than the configured CDN.
 
 ## Cache Write Path
 

@@ -16,7 +16,7 @@ pkgproxy SHALL serve an HTML landing page at `GET /` that lists all configured r
 - **THEN** each upstream mirror URL is rendered as an HTML anchor (`<a href="...">`) that opens the mirror in the browser
 
 ### Requirement: Package manager configuration snippets match README
-The landing page SHALL include copy-paste configuration snippets for repositories whose names appear in the project README client configuration section. Snippets MUST match the URL structure from the README including the full URI path suffix after the repository name (e.g. `/$releasever/BaseOS/$basearch/os/`), with `<pkgproxy>` replaced by the configured public address. Repositories not documented in the README SHALL have their snippet omitted entirely. DEB-based snippets (Debian, Ubuntu) SHALL use a `<release>` placeholder instead of hardcoded release codenames, matching the placeholder convention used by the COPR snippet (`<user>`, `<repo>`). The README retains concrete codename examples for readability; the landing page uses placeholders.
+The landing page SHALL include copy-paste configuration snippets for repositories whose names appear in the project README client configuration section. Snippets MUST match the URL structure from the README including the full URI path suffix after the repository name (e.g. `/$releasever/BaseOS/$basearch/os/`), with `<pkgproxy>` replaced by an address resolved automatically (see "Automatic hostname substitution"). Repositories not documented in the README SHALL have their snippet omitted entirely. DEB-based snippets (Debian, Ubuntu) SHALL use a `<release>` placeholder instead of hardcoded release codenames, matching the placeholder convention used by the COPR snippet (`<user>`, `<repo>`). The README retains concrete codename examples for readability; the landing page uses placeholders.
 
 #### Scenario: Known RPM repository shows dnf/yum baseurl snippet with full path
 - **WHEN** a repository name matches one documented in the README with `.rpm` suffixes
@@ -34,50 +34,39 @@ The landing page SHALL include copy-paste configuration snippets for repositorie
 - **WHEN** a repository name has no matching entry in the README client configuration section
 - **THEN** no configuration snippet is shown for that repository
 
-#### Scenario: Snippet uses listen host:port when no public host is set
-- **WHEN** no public host is configured and pkgproxy is started with `--host h --port p`
-- **THEN** all config snippets on the landing page use `h:p` as the address
+### Requirement: Automatic hostname substitution
+Configuration snippets SHALL NOT depend on a server-side public-address setting. Instead, the address is resolved automatically in two layers:
 
-#### Scenario: Snippet uses public address verbatim without appending listen port
-- **WHEN** a public address is configured via `--public-host` or `PKGPROXY_PUBLIC_HOST`
-- **THEN** all config snippets use that value verbatim and the listen port is not appended
+1. **Server-side default.** Every response renders snippets using the `Host` header of the incoming request, so any client — including `curl` and other non-browser HTTP clients — receives a working, copy-pasteable address without needing JavaScript.
+2. **Client-side correction.** The page additionally includes a small inline script that, once loaded in a browser, compares the server-rendered default against the page's own `window.location.origin` and, if they differ, rewrites the snippets to match it. This corrects cases the `Host` header alone cannot reveal, such as a reverse proxy that terminates TLS (the browser's scheme is `https`, but pkgproxy itself only ever sees plain HTTP).
 
-### Requirement: Configurable public address
-pkgproxy SHALL expose a `--public-host` CLI flag (on the `serve` subcommand) and a `PKGPROXY_PUBLIC_HOST` environment variable that set the address rendered in landing page config snippets. The value MAY include a port (e.g. `myproxy.lan:9090`), in which case that port is used as-is. When a public host is set, the listen port is NOT appended. When no public host is set, the listen `host:port` is used. The CLI flag takes precedence over the environment variable when both are set.
+This keeps snippets correct with no pkgproxy-side configuration in the common case (reverse proxy forwarding the original `Host` header), and self-corrects in the browser when it doesn't.
 
-#### Scenario: Flag sets the public address without appending listen port
-- **WHEN** pkgproxy is started with `--public-host myproxy.lan`
-- **THEN** the landing page config snippets use `myproxy.lan` with no port suffix
+#### Scenario: Server renders snippets using the request's Host header
+- **WHEN** a client sends `GET /` with a given `Host` header
+- **THEN** every configuration snippet on the returned page uses that `Host` value as the address, with no placeholder text
 
-#### Scenario: Flag value with embedded port is used verbatim
-- **WHEN** pkgproxy is started with `--public-host myproxy.lan:9090`
-- **THEN** the landing page config snippets use `myproxy.lan:9090` verbatim
+#### Scenario: Inline script corrects the address to the page's origin when it differs
+- **WHEN** the landing page is loaded in a browser whose `window.location.origin` differs from the server-rendered default (e.g. behind a TLS-terminating reverse proxy)
+- **THEN** an inline script rewrites the address in the rendered snippets to `window.location.origin`
 
-#### Scenario: Environment variable sets the public address
-- **WHEN** `PKGPROXY_PUBLIC_HOST=myproxy.lan` is set and no `--public-host` flag is given
-- **THEN** the landing page config snippets use `myproxy.lan` with no port suffix
+#### Scenario: No client-side change when origins already match
+- **WHEN** the landing page is loaded in a browser whose `window.location.origin` matches the server-rendered default
+- **THEN** the inline script makes no changes to the rendered snippets
 
-#### Scenario: CLI flag takes precedence over environment variable
-- **WHEN** both `--public-host myproxy.lan` and `PKGPROXY_PUBLIC_HOST=other.host` are set
-- **THEN** the landing page config snippets use `myproxy.lan`
+#### Scenario: Server-rendered address is used verbatim without JavaScript
+- **WHEN** the landing page is loaded with JavaScript disabled or unavailable, or fetched with a non-browser client such as `curl`
+- **THEN** the configuration snippets show the server-rendered address derived from the request's `Host` header
 
-#### Scenario: Default renders listen address with port
-- **WHEN** neither `--public-host` nor `PKGPROXY_PUBLIC_HOST` is set
-- **THEN** the landing page config snippets use `<host>:<port>` from the listen configuration
-
-### Requirement: README documents CLI flags and the public host option
-The project README SHALL contain a CLI flags reference table covering all `serve` subcommand flags, including `--public-host` and the `PKGPROXY_PUBLIC_HOST` environment variable with a description of their effect.
+### Requirement: README documents CLI flags
+The project README SHALL contain a CLI flags reference table covering all `serve` subcommand flags.
 
 #### Scenario: README CLI flags table includes all serve flags
 - **WHEN** a user reads the README
 - **THEN** they find a table listing all `serve` subcommand flags with their defaults and descriptions
 
-#### Scenario: README CLI flags table includes public-host and its env var
-- **WHEN** a user reads the README
-- **THEN** they can find `--public-host` and `PKGPROXY_PUBLIC_HOST` with a description of their effect
-
-### Requirement: No external dependencies for page rendering
-The landing page SHALL be rendered using only Go standard library (`html/template`), with no JavaScript or external stylesheet resources.
+### Requirement: No external script, stylesheet, or font dependencies
+The landing page SHALL be rendered using only the Go standard library (`html/template`) plus a small inline script used solely for client-side hostname correction (see "Automatic hostname substitution"). It SHALL NOT load external JavaScript, stylesheets, or fonts.
 
 #### Scenario: Page is self-contained
 - **WHEN** the landing page HTML is served

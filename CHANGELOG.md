@@ -8,13 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Per-repository `cdn` config field to proxy vendor CDNs that publish no public mirrors
+- Per-repository `mtls` config field with client `cert`, `key` and optional `ca` for CDNs using mutual TLS
+- Support for proxying entitled Red Hat content from `cdn.redhat.com` without client-side certificates
+- Client config snippet for Red Hat Enterprise Linux on the landing page and in the README
+- Top-level `branding` config field to customize the landing page title and description
+- Landing page now shows the running pkgproxy version
 - Container image now runs `serve` by default and loads bundled config from `$KO_DATA_PATH`
 - `PKGPROXY_TRUST_PROXY` env var (and `--trust-proxy` flag) to opt in to X-Forwarded-For trust
 - `PKGPROXY_HOST` env var to set the listen address without passing `--host` on the command line
 
 ### Changed
 
+- Repositories must now define exactly one of `mirrors` or `cdn`; setting both is rejected
+- Upstream URLs are validated at startup: they must be absolute and use `http` or `https`
 - **Breaking:** `remote_ip` in access logs now reflects the direct connecting peer by default; set `PKGPROXY_TRUST_PROXY` to restore XFF-based IP extraction when running behind a reverse proxy
+- **Breaking:** Removed the `--public-host` flag and `PKGPROXY_PUBLIC_HOST` env var; the landing page now fills in config snippet hostnames automatically — server-side from the request's `Host` header (works for `curl` too), further corrected client-side to the browser's own URL when that differs (e.g. behind a TLS-terminating reverse proxy)
 - Upgraded Echo web framework to v5.1.1
 - Config-file errors now list all default paths attempted, not just the last one
 

@@ -1,4 +1,8 @@
 ---
+branding:
+  title: Pkgproxy Application
+  description: Caching forward proxy for Linux package repositories
+
 repositories:
   almalinux:
     suffixes:
@@ -87,6 +91,15 @@ repositories:
       - https://mirror.init7.net/rockylinux/
       - https://mirror.puzzle.ch/rockylinux/
       - https://dl.rockylinux.org/pub/rocky/
+  rhel:
+    suffixes:
+      - .drpm
+      - .rpm
+    cdn: https://cdn.redhat.com/
+    mtls:
+      cert: entitlement.pem
+      key: entitlement-key.pem
+      ca: /etc/rhsm/ca/redhat-uep.pem
   ubuntu:
     suffixes:
       - .deb

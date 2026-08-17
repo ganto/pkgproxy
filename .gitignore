@@ -1,3 +1,6 @@
+# local mTLS client certificates (e.g. Red Hat entitlements)
+*.pem
+
 # build and testing artifacts
 /bin/
 /cache/

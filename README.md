@@ -33,11 +33,31 @@ podman run --rm -p 8080:8080 -e PKGPROXY_HOST=0.0.0.0 --volume ./cache:/ko-app/c
 | `--cachedir` | | `cache` | Path to the local cache directory |
 | `--host` | `PKGPROXY_HOST` | `localhost` | Listen address |
 | `--port` | | `8080` | Listen port |
-| `--public-host` | `PKGPROXY_PUBLIC_HOST` | | Public hostname (or `host:port`) shown in landing page config snippets. When set, the listen port is not appended. Useful when running behind a reverse proxy. |
 | `--trust-proxy` | `PKGPROXY_TRUST_PROXY` | | Comma-separated list of trusted proxy sources for X-Forwarded-For. Accepted values: `none`, `loopback`, `private`, a CIDR (e.g. `10.0.0.0/8`), or a bare IP (promoted to `/32`/`/128`). Unset or empty means no XFF trust. |
 | `--debug` | | `false` | Enable debug logging |
 
 Any flag with an env variable listed above can be set via the environment instead of passing the flag.
+
+### Landing page hostname
+
+The config snippets shown on the landing page (`GET /`) need pkgproxy's own
+address, e.g. `baseurl=http://<pkgproxy>/fedora/...`. Rather than relying on a
+server-side setting, this is filled in automatically, with no configuration
+needed:
+
+- **Server-side, from the request's `Host` header.** Every response — including
+  `curl` and other non-browser clients — already contains a working address
+  built from the `Host` header the request itself carried (the same header a
+  reverse proxy forwards by default). No JavaScript required.
+- **Client-side, from the page's own URL.** In a browser, a small inline script
+  additionally corrects the address to `window.location.origin` if it differs
+  from the server-rendered one — which matters behind a reverse proxy that
+  changes the scheme (e.g. TLS termination), since the `Host` header alone
+  can't reveal that.
+
+If a reverse proxy in front of pkgproxy does not forward the original `Host`
+header, `curl` (or a browser with JavaScript disabled) will see whatever host
+pkgproxy itself observed instead.
 
 ### Trusting X-Forwarded-For
 
@@ -66,8 +86,94 @@ Each repository supports the following options:
 |-----|----------|-------------|
 | `suffixes` | yes | File suffixes that are eligible for caching (e.g. `.rpm`, `.deb`). Use `"*"` to cache all files. |
 | `exclude` | no | List of file names to exclude from caching, even when they match a suffix. Useful with the `"*"` wildcard suffix. |
-| `mirrors` | yes | Ordered list of upstream mirror URLs |
-| `retries` | no | Number of attempts per mirror before moving to the next one (default: `1`) |
+| `mirrors` | yes* | Ordered list of upstream mirror URLs |
+| `cdn` | yes* | Single upstream CDN URL, used instead of `mirrors` |
+| `mtls` | no | Client certificate (`cert`), private key (`key`) and optional CA bundle (`ca`) used with a `cdn` requiring mutual TLS |
+| `retries` | no | Number of attempts per upstream before moving to the next one (default: `1`) |
+
+\* Each repository must define exactly one of `mirrors` or `cdn`; setting both is rejected.
+
+### Landing page branding
+
+The top-level `branding` key customizes the title and description shown on the
+landing page (and the HTML `<title>`) served at `/`:
+
+```yaml
+branding:
+  title: Acme Package Mirror
+  description: Internal package cache for Acme Corp.
+
+repositories:
+  ...
+```
+
+Both fields are optional and independent — omitting `branding` entirely, or
+leaving one of the two fields unset, falls back to the default "pkgproxy" title
+and "Caching forward proxy for Linux package repositories." description. The
+landing page also always shows the running pkgproxy version below the
+description.
+
+### CDN upstreams
+
+Some vendors do not publish public mirrors and serve their packages from a single
+CDN instead. Use `cdn` in place of `mirrors` for those repositories:
+
+```yaml
+repositories:
+  rhel:
+    suffixes:
+      - .rpm
+    cdn: https://cdn.redhat.com/
+```
+
+Requests are mapped the same way as for mirrors: the repository name is stripped
+from the request path and the remainder is appended to the CDN URL, so
+`/rhel/content/dist/rhel9/9/x86_64/baseos/os/` is fetched from
+`https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/`.
+
+### CDN client certificates (mTLS)
+
+When the CDN requires mutual TLS — as the Red Hat CDN does for entitled content —
+add an `mtls` block with the client certificate and its private key. pkgproxy
+presents them during the TLS handshake with the CDN:
+
+```yaml
+repositories:
+  rhel:
+    suffixes:
+      - .drpm
+      - .rpm
+    cdn: https://cdn.redhat.com/
+    mtls:
+      cert: /etc/pki/entitlement/1234567890123456789.pem
+      key: /etc/pki/entitlement/1234567890123456789-key.pem
+      ca: /etc/rhsm/ca/redhat-uep.pem
+```
+
+On a subscribed Red Hat host the entitlement certificate and its key are the
+`.pem` file pair in `/etc/pki/entitlement/`.
+
+The optional `ca` points at a CA bundle used to verify the CDN's *own* server
+certificate, and is added to the system trust store rather than replacing it.
+It is required for `cdn.redhat.com`, whose certificate is issued by a private
+Red Hat CA that public trust stores do not contain — without it every request
+fails with `x509: certificate signed by unknown authority`.
+
+Notes:
+
+- `mtls` is only valid together with `cdn`, and both `cert` and `key` are required.
+- Relative paths are resolved against the working directory of the pkgproxy
+  process. Prefer absolute paths, especially for container deployments.
+- pkgproxy **refuses to start** if the certificate, key or CA bundle cannot be
+  loaded. Proxying without them would only produce opaque TLS or authorization
+  errors from the CDN.
+- The certificate is scoped to the configured CDN host. If the CDN redirects to a
+  different host, the redirect is followed **without** the client certificate so
+  the credential is never sent elsewhere.
+- Clients talking to pkgproxy need no entitlement certificate of their own — this
+  is the point of proxying an entitled CDN for a local network. Protect access to
+  pkgproxy accordingly, since it will serve entitled content to anyone who can
+  reach it.
 
 ### Mirror retries
 
@@ -213,6 +319,21 @@ For Enterprise distributions the URL suffix `epel-$releasever-$basearch` must be
 # mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever$rltype
 baseurl=http://<pkgproxy>:8080/rockylinux/$releasever/BaseOS/$basearch/os/
 ```
+
+### Red Hat Enterprise Linux
+
+Requires a `rhel` repository configured with `cdn` and `mtls` (see [CDN client
+certificates](#cdn-client-certificates-mtls)). Disable the subscription-manager
+managed repositories, then e.g. `/etc/yum.repos.d/rhel.repo` (adjust other
+repositories accordingly):
+```
+[rhel-baseos-rpms]
+# baseurl=https://cdn.redhat.com/content/dist/rhel$releasever/$releasever/$basearch/baseos/os
+baseurl=http://<pkgproxy>:8080/rhel/content/dist/rhel$releasever/$releasever/$basearch/baseos/os
+```
+
+The client needs no `sslclientcert`/`sslclientkey` of its own — pkgproxy holds the
+entitlement certificate and authenticates against the CDN on the client's behalf.
 
 ### Ubuntu
 

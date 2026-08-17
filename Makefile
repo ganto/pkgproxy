@@ -113,7 +113,8 @@ $(if $(filter debian,$(1)),TestDebian,\
 $(if $(filter ubuntu,$(1)),TestUbuntu,\
 $(if $(filter archlinux,$(1)),TestArch,\
 $(if $(filter gentoo,$(1)),TestGentoo,\
-$(error Unknown DISTRO: $(1). Use one of: fedora centos-stream almalinux rockylinux debian ubuntu archlinux gentoo))))))))))
+$(if $(filter rhel,$(1)),TestRHEL,\
+$(error Unknown DISTRO: $(1). Use one of: fedora centos-stream almalinux rockylinux debian ubuntu archlinux gentoo rhel)))))))))))
 endef
 
 .PHONY: e2e
@@ -157,7 +158,7 @@ run: format vet generate ## Run the application from your host
 	$(info *************************************************)
 	$(info ********** EXECUTING 'run' MAKE TARGET **********)
 	$(info *************************************************)
-	PKGPROXY_CONFIG=./configs/pkgproxy.yaml PKGPROXY_PUBLIC_HOST=$(shell hostname):8080 CGO_ENABLED=$(CGO_ENABLED) go run . serve --host 0.0.0.0 --debug
+	PKGPROXY_CONFIG=./configs/pkgproxy.yaml CGO_ENABLED=$(CGO_ENABLED) go run . serve --host 0.0.0.0 --debug
 
 PLATFORMS := $(shell echo $(ARCHS) | sed 's/,/ /g' | sed 's/[^ ]\+/linux\/&/g' | tr ' ' ',')
 

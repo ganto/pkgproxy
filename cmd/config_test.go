@@ -24,20 +24,20 @@ func writeConfig(t *testing.T, dir, name string) string {
 
 func TestResolveConfigPath(t *testing.T) {
 	tests := []struct {
-		name             string
-		localExists      bool
-		localIsDir       bool
-		koDataSet        bool
-		koFileExists     bool
-		wantPath         func(koDir string) string
-		wantCandidates   func(koDir string) []string
+		name           string
+		localExists    bool
+		localIsDir     bool
+		koDataSet      bool
+		koFileExists   bool
+		wantPath       func(koDir string) string
+		wantCandidates func(koDir string) []string
 	}{
 		{
-			name:         "local file wins over ko fallback",
-			localExists:  true,
-			koDataSet:    true,
-			koFileExists: true,
-			wantPath:     func(_ string) string { return defaultConfigPath },
+			name:           "local file wins over ko fallback",
+			localExists:    true,
+			koDataSet:      true,
+			koFileExists:   true,
+			wantPath:       func(_ string) string { return defaultConfigPath },
 			wantCandidates: func(_ string) []string { return []string{defaultConfigPath} },
 		},
 		{
@@ -51,10 +51,10 @@ func TestResolveConfigPath(t *testing.T) {
 			},
 		},
 		{
-			name:        "both missing returns default path",
-			localExists: false,
-			koDataSet:   false,
-			wantPath:    func(_ string) string { return defaultConfigPath },
+			name:           "both missing returns default path",
+			localExists:    false,
+			koDataSet:      false,
+			wantPath:       func(_ string) string { return defaultConfigPath },
 			wantCandidates: func(_ string) []string { return []string{defaultConfigPath} },
 		},
 		{

@@ -99,9 +99,8 @@ func projectRoot() string {
 	return filepath.Join(wd, "..", "..")
 }
 
-func startPkgproxy(t *testing.T, port int, cacheDir string) {
+func startPkgproxy(t *testing.T, port int, cacheDir string, configPath string) {
 	t.Helper()
-	configPath := filepath.Join(projectRoot(), "configs", "pkgproxy.yaml")
 	cmd := exec.Command(pkgproxyBin, "serve",
 		"--host", "0.0.0.0",
 		"--port", fmt.Sprintf("%d", port),
@@ -189,10 +188,20 @@ func assertCachedFiles(t *testing.T, cacheDir string, repoPrefix string, suffix 
 // It returns the proxy address and cache directory.
 func setupPkgproxy(t *testing.T) (proxyAddr string, cacheDir string) {
 	t.Helper()
+	configPath := filepath.Join(projectRoot(), "configs", "pkgproxy.yaml")
+	return setupPkgproxyWithConfig(t, configPath)
+}
+
+// setupPkgproxyWithConfig starts pkgproxy with a caller-provided config file
+// instead of the default configs/pkgproxy.yaml. Used for repositories (like
+// mTLS-backed CDNs) that require credentials which cannot be committed to the
+// repo and are therefore not part of the shipped default config.
+func setupPkgproxyWithConfig(t *testing.T, configPath string) (proxyAddr string, cacheDir string) {
+	t.Helper()
 	detectContainerRuntime(t)
 	port := freePort(t)
 	cacheDir = t.TempDir()
-	startPkgproxy(t, port, cacheDir)
+	startPkgproxy(t, port, cacheDir, configPath)
 	proxyAddr = fmt.Sprintf("%s:%d", hostGateway, port)
 	return proxyAddr, cacheDir
 }
@@ -367,6 +376,65 @@ gpgcheck=0
 		)
 		assertCachedFiles(t, cacheDir, "copr", ".rpm")
 	})
+}
+
+// TestRHEL exercises the CDN + mTLS proxy path against the real Red Hat CDN.
+// The entitlement certificate is tied to a paid subscription and cannot be
+// committed to the repo, so this test is skipped unless the environment
+// points PKGPROXY_RHEL_CERT / PKGPROXY_RHEL_KEY at a valid key pair (and,
+// unless the standard subscription-manager path already has it, at a CA
+// bundle via PKGPROXY_RHEL_CA) — it never runs in CI.
+func TestRHEL(t *testing.T) {
+	certPath := os.Getenv("PKGPROXY_RHEL_CERT")
+	keyPath := os.Getenv("PKGPROXY_RHEL_KEY")
+	if certPath == "" || keyPath == "" {
+		t.Skip("Set PKGPROXY_RHEL_CERT and PKGPROXY_RHEL_KEY to a Red Hat entitlement certificate/key pair to run this test")
+	}
+
+	caPath := os.Getenv("PKGPROXY_RHEL_CA")
+	if caPath == "" {
+		caPath = "/etc/rhsm/ca/redhat-uep.pem"
+	}
+	if _, err := os.Stat(caPath); err != nil {
+		t.Skipf("mTLS CA bundle not found at %s; set PKGPROXY_RHEL_CA to override", caPath)
+	}
+
+	release := releaseOrDefault("9")
+
+	configPath := filepath.Join(t.TempDir(), "pkgproxy.yaml")
+	configContent := fmt.Sprintf(`---
+repositories:
+  rhel:
+    suffixes:
+      - .drpm
+      - .rpm
+    cdn: https://cdn.redhat.com/
+    mtls:
+      cert: %s
+      key: %s
+      ca: %s
+`, certPath, keyPath, caPath)
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0644))
+
+	proxyAddr, cacheDir := setupPkgproxyWithConfig(t, configPath)
+
+	// gpgcheck is disabled: the mTLS/CDN path under test is unrelated to
+	// package signature verification, and pinning the RHEL GPG key filename
+	// would only add an unrelated way for the test to break.
+	repoFile := dnfRepoFile(t, "rhel", fmt.Sprintf(`[rhel-baseos-rpms]
+baseurl=http://%s/rhel/content/dist/rhel$releasever/$releasever/$basearch/baseos/os
+gpgcheck=0
+`, proxyAddr))
+
+	image := fmt.Sprintf("registry.access.redhat.com/ubi%s/ubi", release)
+	runContainer(t, image,
+		[]string{
+			filepath.Join(scriptDir(), "test-dnf.sh") + ":/test-dnf.sh:ro,z",
+			repoFile + ":/etc/yum.repos.d/pkgproxy-rhel.repo:ro,z",
+		},
+		[]string{"bash", "/test-dnf.sh", proxyAddr, "tree"},
+	)
+	assertCachedFiles(t, cacheDir, "rhel", ".rpm")
 }
 
 func TestRockyLinux(t *testing.T) {

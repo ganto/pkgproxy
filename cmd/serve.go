@@ -25,7 +25,6 @@ import (
 var (
 	listenAddress      string
 	listenPort         uint16
-	publicHost         string
 	trustProxy         string
 	ipExtractor        echo.IPExtractor
 	resolvedTrustProxy string
@@ -35,7 +34,6 @@ const (
 	defaultAddress   = "localhost"
 	defaultPort      = 8080
 	hostEnvVar       = "PKGPROXY_HOST"
-	publicHostEnvVar = "PKGPROXY_PUBLIC_HOST"
 	trustProxyEnvVar = "PKGPROXY_TRUST_PROXY"
 )
 
@@ -59,7 +57,6 @@ func newServeCommand() *cobra.Command {
 	}
 	c.PersistentFlags().StringVar(&listenAddress, "host", defaultAddress, "listen address of the pkgproxy.")
 	c.PersistentFlags().Uint16Var(&listenPort, "port", defaultPort, "listen port of the pkgproxy.")
-	c.PersistentFlags().StringVar(&publicHost, "public-host", "", "public hostname (or host:port) shown in landing page config snippets; overrides PKGPROXY_PUBLIC_HOST.")
 	c.PersistentFlags().StringVar(&trustProxy, "trust-proxy", "", "comma-separated list of trusted proxy addresses for X-Forwarded-For: none, loopback, private, CIDR, or IP; overrides PKGPROXY_TRUST_PROXY.")
 
 	return c
@@ -74,19 +71,6 @@ func resolveListenHost(flagChanged bool, flagValue, envValue string) string {
 		return envValue
 	}
 	return defaultAddress
-}
-
-// resolvePublicAddr determines the address rendered in landing page config snippets.
-// The CLI flag takes precedence over the environment variable. If neither is set,
-// the listen host:port is used.
-func resolvePublicAddr(flagValue string, listenAddr string, port uint16) string {
-	if flagValue != "" {
-		return flagValue
-	}
-	if v := os.Getenv(publicHostEnvVar); v != "" {
-		return v
-	}
-	return fmt.Sprintf("%s:%d", listenAddr, port)
 }
 
 // resolveTrustProxy determines the trust-proxy value using flag → env var → default precedence.
@@ -221,12 +205,14 @@ func startServer(_ *cobra.Command, _ []string) error {
 	})
 	app.Use(middleware.Recover())
 
-	pkgProxy := pkgproxy.New(&pkgproxy.PkgProxyConfig{
+	pkgProxy, err := pkgproxy.New(&pkgproxy.PkgProxyConfig{
 		CacheBasePath:    cacheDir,
 		RepositoryConfig: &repoConfig,
 	})
-	publicAddr := resolvePublicAddr(publicHost, listenAddress, listenPort)
-	app.GET("/", pkgproxy.LandingHandler(&repoConfig, publicAddr))
+	if err != nil {
+		return fmt.Errorf("unable to initialize proxy: %w", err)
+	}
+	app.GET("/", pkgproxy.LandingHandler(&repoConfig, Version))
 	app.Use(pkgProxy.Cache)
 	app.Use(pkgProxy.ForwardProxy)
 

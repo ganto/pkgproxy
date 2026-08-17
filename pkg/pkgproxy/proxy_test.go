@@ -31,10 +31,11 @@ func newTestProxy(t *testing.T, mirrors []string) (PkgProxy, string) {
 			},
 		},
 	}
-	pp := New(&PkgProxyConfig{
+	pp, err := New(&PkgProxyConfig{
 		CacheBasePath:    cacheDir,
 		RepositoryConfig: repoConfig,
 	})
+	require.NoError(t, err)
 	return pp, cacheDir
 }
 
@@ -52,11 +53,34 @@ func newTestProxyWithRetries(t *testing.T, mirrors []string, retries int) (PkgPr
 			},
 		},
 	}
-	pp := New(&PkgProxyConfig{
+	pp, err := New(&PkgProxyConfig{
 		CacheBasePath:    cacheDir,
 		RepositoryConfig: repoConfig,
 	})
+	require.NoError(t, err)
 	pp.(*pkgProxy).retryBaseDelay = 0
+	return pp, cacheDir
+}
+
+// newCDNTestProxy creates a pkgProxy with a single CDN-backed "testrepo"
+// repository. mtls and transport may be nil.
+func newCDNTestProxy(t *testing.T, cdn string, mtls *MTLSConfig, transport http.RoundTripper) (PkgProxy, string) {
+	t.Helper()
+	cacheDir := t.TempDir()
+	pp, err := New(&PkgProxyConfig{
+		CacheBasePath: cacheDir,
+		RepositoryConfig: &RepoConfig{
+			Repositories: map[string]Repository{
+				"testrepo": {
+					CacheSuffixes: []string{".rpm"},
+					CDN:           cdn,
+					MTLS:          mtls,
+				},
+			},
+		},
+		Transport: transport,
+	})
+	require.NoError(t, err)
 	return pp, cacheDir
 }
 
@@ -157,7 +181,7 @@ func TestNewDefaultTransport(t *testing.T) {
 func TestNewCustomTransport(t *testing.T) {
 	customTransport := &http.Transport{}
 	cacheDir := t.TempDir()
-	pp := New(&PkgProxyConfig{
+	pp, err := New(&PkgProxyConfig{
 		CacheBasePath: cacheDir,
 		RepositoryConfig: &RepoConfig{
 			Repositories: map[string]Repository{
@@ -166,13 +190,14 @@ func TestNewCustomTransport(t *testing.T) {
 		},
 		Transport: customTransport,
 	})
+	require.NoError(t, err)
 	proxy := pp.(*pkgProxy)
 	assert.Same(t, customTransport, proxy.transport)
 }
 
 func TestNewParsesUpstreams(t *testing.T) {
 	cacheDir := t.TempDir()
-	pp := New(&PkgProxyConfig{
+	pp, err := New(&PkgProxyConfig{
 		CacheBasePath: cacheDir,
 		RepositoryConfig: &RepoConfig{
 			Repositories: map[string]Repository{
@@ -181,12 +206,14 @@ func TestNewParsesUpstreams(t *testing.T) {
 			},
 		},
 	})
+	require.NoError(t, err)
 	proxy := pp.(*pkgProxy)
 
 	assert.Len(t, proxy.upstreams, 2)
-	assert.Len(t, proxy.upstreams["repo1"].mirrors, 2)
-	assert.Len(t, proxy.upstreams["repo2"].mirrors, 1)
-	assert.Equal(t, "a.com", proxy.upstreams["repo1"].mirrors[0].Host)
+	assert.Len(t, proxy.upstreams["repo1"].targets, 2)
+	assert.Len(t, proxy.upstreams["repo2"].targets, 1)
+	assert.Equal(t, "a.com", proxy.upstreams["repo1"].targets[0].Host)
+	assert.Nil(t, proxy.upstreams["repo1"].transport)
 }
 
 // --- Cache middleware tests ---
@@ -566,7 +593,7 @@ func TestForwardProxyUpstreamPath(t *testing.T) {
 
 	// Mirror with a base path
 	cacheDir := t.TempDir()
-	pp := New(&PkgProxyConfig{
+	pp, err := New(&PkgProxyConfig{
 		CacheBasePath: cacheDir,
 		RepositoryConfig: &RepoConfig{
 			Repositories: map[string]Repository{
@@ -577,6 +604,7 @@ func TestForwardProxyUpstreamPath(t *testing.T) {
 			},
 		},
 	})
+	require.NoError(t, err)
 	app := newTestApp(pp)
 
 	req := httptest.NewRequest(http.MethodGet, "/testrepo/sub/dir/file.rpm", nil)
@@ -728,10 +756,11 @@ func TestCacheDiskWriteErrorDoesNotAffectClient(t *testing.T) {
 			},
 		},
 	}
-	pp := New(&PkgProxyConfig{
+	pp, err := New(&PkgProxyConfig{
 		CacheBasePath:    filepath.Join(cacheDir, "readonly"),
 		RepositoryConfig: repoConfig,
 	})
+	require.NoError(t, err)
 	// Make the cache base path read-only
 	require.NoError(t, os.MkdirAll(filepath.Join(cacheDir, "readonly"), 0o555))
 
@@ -759,7 +788,7 @@ func TestForwardProxyWithHttpbin(t *testing.T) {
 	// Use httpbin.org to verify the proxy can reach real HTTP servers.
 	// httpbin.org/anything/<path> returns 200 with request details in JSON.
 	cacheDir := t.TempDir()
-	pp := New(&PkgProxyConfig{
+	pp, err := New(&PkgProxyConfig{
 		CacheBasePath: cacheDir,
 		RepositoryConfig: &RepoConfig{
 			Repositories: map[string]Repository{
@@ -770,6 +799,7 @@ func TestForwardProxyWithHttpbin(t *testing.T) {
 			},
 		},
 	})
+	require.NoError(t, err)
 	app := newTestApp(pp)
 
 	req := httptest.NewRequest(http.MethodGet, "/testrepo/some/path/file.rpm", nil)
