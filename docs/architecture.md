@@ -27,7 +27,7 @@ Mirrors are tried in order. Per mirror, up to `retries` attempts are made (defau
 
 ## Cache Write Path
 
-When a file is a cache candidate and not yet cached, the `http.ResponseWriter` is replaced with a `bufferWriter` that tee-writes to both the original writer and an in-memory `bytes.Buffer`. After `next(c)` returns with status 200, the buffer is flushed to disk via `FileCache.SaveToDisk`. The file mtime is set to the upstream `Last-Modified` header value if present.
+When a file is a cache candidate and not yet cached, the `http.ResponseWriter` is replaced with a tee-writer that streams the response body to the client and to a temp file in the cache directory at the same time, so large packages are never held in memory. Once the response completes successfully, the temp file is committed atomically (see `FileCache`); its mtime is set to the upstream `Last-Modified` header value if present. An upstream failure or a truncated transfer leaves the temp file uncommitted and it is discarded. A client disconnect does not abort the upstream fetch, so the file is still cached. Cache writes never break the client response: disk errors are logged and absorbed, and the client still receives whatever the upstream sent.
 
 ## Header Filtering
 
