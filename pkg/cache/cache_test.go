@@ -3,7 +3,6 @@
 package cache
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -266,26 +265,4 @@ func TestIsCacheCandidate(t *testing.T) {
 			assert.Equal(t, tt.want, c.IsCacheCandidate(tt.uri))
 		})
 	}
-}
-
-func TestSaveToDiskStillWorks(t *testing.T) {
-	baseDir := t.TempDir()
-	c := New(&CacheConfig{BasePath: baseDir})
-
-	buf := bytes.NewBufferString("buffered content")
-	mtime := time.Date(2025, 6, 1, 12, 0, 0, 0, time.UTC)
-
-	err := c.SaveToDisk("/myrepo/path/package.rpm", buf, mtime)
-	require.NoError(t, err)
-
-	finalPath := filepath.Join(baseDir, "myrepo", "path", "package.rpm")
-	data, err := os.ReadFile(finalPath)
-	require.NoError(t, err)
-	assert.Equal(t, "buffered content", string(data))
-
-	info, err := os.Stat(finalPath)
-	require.NoError(t, err)
-	assert.Equal(t, mtime, info.ModTime().UTC())
-
-	assert.True(t, c.IsCached("/myrepo/path/package.rpm"))
 }

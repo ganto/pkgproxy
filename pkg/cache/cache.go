@@ -3,7 +3,6 @@
 package cache
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -41,9 +40,6 @@ type FileCache interface {
 
 	// Return if file exists in cache for given URL
 	IsCached(string) bool
-
-	// Save buffer as file in cache for given URL
-	SaveToDisk(string, *bytes.Buffer, time.Time) error
 }
 
 type cache struct {
@@ -182,31 +178,4 @@ func (c *cache) CommitTempFile(tmpPath string, uri string, mtime time.Time) erro
 
 	slog.Info("cache write", "path", filePath, "bytes", info.Size())
 	return os.Rename(tmpPath, filePath)
-}
-
-// Saves buffer to file
-func (c *cache) SaveToDisk(uri string, buffer *bytes.Buffer, fileTime time.Time) error {
-	tmpFile, err := c.CreateTempWriter(uri)
-	if err != nil {
-		return err
-	}
-	tmpPath := tmpFile.Name()
-
-	_, err = tmpFile.ReadFrom(buffer)
-	closeErr := tmpFile.Close()
-	if err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	if closeErr != nil {
-		_ = os.Remove(tmpPath)
-		return closeErr
-	}
-
-	if err := c.CommitTempFile(tmpPath, uri, fileTime); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-
-	return nil
 }
