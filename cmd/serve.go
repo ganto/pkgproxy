@@ -163,28 +163,13 @@ func parseTrustProxy(value string) (echo.IPExtractor, error) {
 	return echo.ExtractIPFromXFFHeader(opts...), nil
 }
 
-func startServer(_ *cobra.Command, _ []string) error {
-	logLevel := slog.LevelInfo
-	if enableDebug {
-		logLevel = slog.LevelDebug
-	}
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
-	slog.Info("starting pkgproxy",
-		"version", Version,
-		"gitCommit", GitCommit,
-		"goVersion", runtime.Version(),
-		"buildDate", buildDate(),
-	)
-	trustProxyLog := resolvedTrustProxy
-	if trustProxyLog == "" {
-		trustProxyLog = "none"
-	}
-	slog.Info("trust-proxy", "value", trustProxyLog)
-
-	app := echo.New()
+// newEchoApp wires up the Echo application: IP extraction, middleware chain,
+// the landing page route and the caching forward proxy.
+func newEchoApp(cacheBasePath string, config *pkgproxy.RepoConfig, publicAddr string, extractor echo.IPExtractor) *echo.Echo {
+	app := pkgproxy.NewEcho()
 	// Extract client IP from X-Forwarded-For only when a trusted proxy is explicitly configured
 	// via --trust-proxy. By default, XFF is ignored and the direct connecting IP is used.
-	app.IPExtractor = ipExtractor
+	app.IPExtractor = extractor
 
 	app.Use(middleware.RequestID())
 	app.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -222,13 +207,36 @@ func startServer(_ *cobra.Command, _ []string) error {
 	app.Use(middleware.Recover())
 
 	pkgProxy := pkgproxy.New(&pkgproxy.PkgProxyConfig{
-		CacheBasePath:    cacheDir,
-		RepositoryConfig: &repoConfig,
+		CacheBasePath:    cacheBasePath,
+		RepositoryConfig: config,
 	})
-	publicAddr := resolvePublicAddr(publicHost, listenAddress, listenPort)
-	app.GET("/", pkgproxy.LandingHandler(&repoConfig, publicAddr))
+	app.GET("/", pkgproxy.LandingHandler(config, publicAddr))
 	app.Use(pkgProxy.Cache)
 	app.Use(pkgProxy.ForwardProxy)
+
+	return app
+}
+
+func startServer(_ *cobra.Command, _ []string) error {
+	logLevel := slog.LevelInfo
+	if enableDebug {
+		logLevel = slog.LevelDebug
+	}
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
+	slog.Info("starting pkgproxy",
+		"version", Version,
+		"gitCommit", GitCommit,
+		"goVersion", runtime.Version(),
+		"buildDate", buildDate(),
+	)
+	trustProxyLog := resolvedTrustProxy
+	if trustProxyLog == "" {
+		trustProxyLog = "none"
+	}
+	slog.Info("trust-proxy", "value", trustProxyLog)
+
+	publicAddr := resolvePublicAddr(publicHost, listenAddress, listenPort)
+	app := newEchoApp(cacheDir, &repoConfig, publicAddr, ipExtractor)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

@@ -4,8 +4,12 @@ package cmd
 
 import (
 	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"testing"
 
+	"github.com/ganto/pkgproxy/pkg/pkgproxy"
+	echo "github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -325,4 +329,28 @@ func TestResolvePublicAddr(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestNewEchoAppLandingMethods(t *testing.T) {
+	config := &pkgproxy.RepoConfig{
+		Repositories: map[string]pkgproxy.Repository{
+			"fedora": {CacheSuffixes: []string{".rpm"}, Mirrors: []string{"https://mirror.example.com/fedora/"}},
+		},
+	}
+	app := newEchoApp(t.TempDir(), config, "localhost:8080", echo.ExtractIPDirect())
+
+	// GET establishes the body size that HEAD must advertise.
+	getRec := httptest.NewRecorder()
+	app.ServeHTTP(getRec, httptest.NewRequest(http.MethodGet, "/", nil))
+	assert.Equal(t, http.StatusOK, getRec.Code)
+	assert.NotEmpty(t, getRec.Body.Len())
+
+	// HEAD must be answered by the GET route (AutoHandleHEAD) instead of 405,
+	// with the body suppressed but Content-Length preserved.
+	headRec := httptest.NewRecorder()
+	app.ServeHTTP(headRec, httptest.NewRequest(http.MethodHead, "/", nil))
+	assert.Equal(t, http.StatusOK, headRec.Code)
+	assert.Equal(t, 0, headRec.Body.Len())
+	assert.Contains(t, headRec.Header().Get("Content-Type"), "text/html")
+	assert.Equal(t, strconv.Itoa(getRec.Body.Len()), headRec.Header().Get("Content-Length"))
 }
