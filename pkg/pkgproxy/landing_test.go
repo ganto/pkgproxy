@@ -12,7 +12,7 @@ import (
 )
 
 func newLandingApp(config *RepoConfig, publicAddr string) *echo.Echo {
-	app := echo.New()
+	app := NewEcho()
 	app.GET("/", LandingHandler(config, publicAddr))
 	return app
 }

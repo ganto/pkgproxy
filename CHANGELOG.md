@@ -15,8 +15,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - **Breaking:** `remote_ip` in access logs now reflects the direct connecting peer by default; set `PKGPROXY_TRUST_PROXY` to restore XFF-based IP extraction when running behind a reverse proxy
-- Upgraded Echo web framework to v5.1.1
+- Upgraded Echo web framework to v5.3.1
 - Config-file errors now list all default paths attempted, not just the last one
+
+### Fixed
+
+- `HEAD` requests to the landing page now return 200 instead of 405, so health checks work
 
 ## [v0.2.0](https://github.com/ganto/pkgproxy/releases/tag/v0.2.0) - 2026-04-06
 

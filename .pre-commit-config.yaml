@@ -15,6 +15,9 @@ repos:
     hooks:
       - id: codespell
         args: [--ignore-words-list=wantIn]
+        # go.mod/go.sum hold base64 module hashes that randomly match dictionary
+        # words (e.g. "...TTkT+tE=" -> "tE"). Nothing in them is prose.
+        exclude: ^go\.(mod|sum)$
   - repo: https://github.com/rhysd/actionlint
     rev: v1.7.11
     hooks:

@@ -3,7 +3,7 @@ module github.com/ganto/pkgproxy
 go 1.25.0
 
 require (
-	github.com/labstack/echo/v5 v5.1.1
+	github.com/labstack/echo/v5 v5.3.1
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
 	gopkg.in/yaml.v3 v3.0.1

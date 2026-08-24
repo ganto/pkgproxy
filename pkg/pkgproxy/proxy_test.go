@@ -62,7 +62,7 @@ func newTestProxyWithRetries(t *testing.T, mirrors []string, retries int) (PkgPr
 
 // newTestApp creates an Echo app with the standard middleware chain used in tests.
 func newTestApp(pp PkgProxy) *echo.Echo {
-	app := echo.New()
+	app := NewEcho()
 	app.Use(middleware.RequestID())
 	app.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
@@ -520,7 +520,7 @@ func TestForwardProxyMethodNotAllowed(t *testing.T) {
 		t.Run(method, func(t *testing.T) {
 			pp, _ := newTestProxy(t, []string{"http://example.com/"})
 			// Use only ForwardProxy middleware (skip Cache which handles DELETE differently)
-			app := echo.New()
+			app := NewEcho()
 			app.Use(middleware.RequestID())
 			app.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 				return func(c *echo.Context) error {
