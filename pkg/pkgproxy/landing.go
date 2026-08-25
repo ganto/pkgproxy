@@ -31,7 +31,7 @@ ul { padding-left: 1.4em; }
 <p>pkgproxy {{.Version}}</p>
 {{range .Repos}}
 <h2>{{.Name}}</h2>
-<p><strong>Mirrors:</strong></p>s
+<p><strong>Mirrors:</strong></p>
 <ul>{{range .Mirrors}}<li><a href="{{.}}">{{.}}</a></li>{{end}}</ul>
 {{with repoSnippet .Name}}
 <p><strong>Configuration snippet:</strong></p>
