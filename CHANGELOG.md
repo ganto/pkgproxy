@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/ganto/pkgproxy/commits/HEAD/)
 
+## [v0.3.0](https://github.com/ganto/pkgproxy/releases/tag/v0.3.0) - 2026-08-29
+
 ### Added
 
 - Container image now runs `serve` by default and loads bundled config from `$KO_DATA_PATH`
