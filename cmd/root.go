@@ -21,10 +21,23 @@ var (
 )
 
 const (
+	cachedirEnvVar    = "PKGPROXY_CACHEDIR"
 	configPathEnvVar  = "PKGPROXY_CONFIG"
 	defaultConfigPath = "./pkgproxy.yaml"
 	defaultDir        = "cache"
 )
+
+// resolveCacheDir determines the local cache directory using flag → env var →
+// default precedence.
+func resolveCacheDir(flagChanged bool, flagValue, envValue string) string {
+	if flagChanged {
+		return flagValue
+	}
+	if envValue != "" {
+		return envValue
+	}
+	return defaultDir
+}
 
 // NewRootCommand creates a new root cli command instance
 func NewRootCommand() *cobra.Command {
