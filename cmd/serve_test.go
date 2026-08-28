@@ -65,6 +65,58 @@ func TestResolveListenHost(t *testing.T) {
 	}
 }
 
+func TestResolveCacheDir(t *testing.T) {
+	tests := []struct {
+		name        string
+		flagChanged bool
+		flagValue   string
+		envValue    string
+		want        string
+	}{
+		{
+			name:        "flag changed wins over env var",
+			flagChanged: true,
+			flagValue:   "/data/cache",
+			envValue:    "/other",
+			want:        "/data/cache",
+		},
+		{
+			name:        "flag changed wins even when value equals default",
+			flagChanged: true,
+			flagValue:   "cache",
+			envValue:    "/data/cache",
+			want:        "cache",
+		},
+		{
+			name:        "env var used when flag unchanged",
+			flagChanged: false,
+			flagValue:   "cache",
+			envValue:    "/var/cache/pkgproxy",
+			want:        "/var/cache/pkgproxy",
+		},
+		{
+			name:        "empty env var falls through to default",
+			flagChanged: false,
+			flagValue:   "cache",
+			envValue:    "",
+			want:        "cache",
+		},
+		{
+			name:        "neither set returns default",
+			flagChanged: false,
+			flagValue:   "cache",
+			envValue:    "",
+			want:        "cache",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := resolveCacheDir(tt.flagChanged, tt.flagValue, tt.envValue)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestResolveTrustProxy(t *testing.T) {
 	tests := []struct {
 		name        string

@@ -45,6 +45,7 @@ func newServeCommand() *cobra.Command {
 		Args:  cobra.ArbitraryArgs,
 		Short: "Start forward proxy",
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			cacheDir = resolveCacheDir(cmd.Flag("cachedir").Changed, cacheDir, os.Getenv(cachedirEnvVar))
 			listenAddress = resolveListenHost(cmd.Flag("host").Changed, listenAddress, os.Getenv(hostEnvVar))
 			resolvedTrustProxy = resolveTrustProxy(cmd.Flag("trust-proxy").Changed, trustProxy, os.Getenv(trustProxyEnvVar))
 			var err error

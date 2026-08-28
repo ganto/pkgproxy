@@ -30,7 +30,7 @@ podman run --rm -p 8080:8080 -e PKGPROXY_HOST=0.0.0.0 --volume ./cache:/ko-app/c
 | Flag | Env Variable | Default | Description |
 |------|--------------|---------|-------------|
 | `--config, -c` | `PKGPROXY_CONFIG` | `./pkgproxy.yaml` | Path to the repository config file |
-| `--cachedir` | | `cache` | Path to the local cache directory |
+| `--cachedir` | `PKGPROXY_CACHEDIR` | `cache` | Path to the local cache directory |
 | `--host` | `PKGPROXY_HOST` | `localhost` | Listen address |
 | `--port` | | `8080` | Listen port |
 | `--public-host` | `PKGPROXY_PUBLIC_HOST` | | Public hostname (or `host:port`) shown in landing page config snippets. When set, the listen port is not appended. Useful when running behind a reverse proxy. |

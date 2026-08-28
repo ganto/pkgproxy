@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Container image now runs `serve` by default and loads bundled config from `$KO_DATA_PATH`
 - `PKGPROXY_TRUST_PROXY` env var (and `--trust-proxy` flag) to opt in to X-Forwarded-For trust
 - `PKGPROXY_HOST` env var to set the listen address without passing `--host` on the command line
+- `PKGPROXY_CACHEDIR` env var to set the cache directory without passing `--cachedir` on the command line
 
 ### Changed
 
