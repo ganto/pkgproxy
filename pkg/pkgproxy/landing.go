@@ -16,7 +16,7 @@ const landingTemplate = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>pkgproxy</title>
+<title>{{.Title}}</title>
 <style>
 body { font-family: monospace; max-width: 900px; margin: 2em auto; padding: 0 1em; color: #222; }
 h1 { border-bottom: 2px solid #444; padding-bottom: 0.3em; }
@@ -26,9 +26,10 @@ ul { padding-left: 1.4em; }
 </style>
 </head>
 <body>
-<h1>pkgproxy</h1>
-<p>Caching forward proxy for Linux package repositories.</p>
-{{range .}}
+<h1>{{.Title}}</h1>
+<p>{{.Description}}</p>
+<p>pkgproxy {{.Version}}</p>
+{{range .Repos}}
 <h2>{{.Name}}</h2>
 <p><strong>Mirrors:</strong></p>
 <ul>{{range .Mirrors}}<li><a href="{{.}}">{{.}}</a></li>{{end}}</ul>
@@ -40,6 +41,13 @@ ul { padding-left: 1.4em; }
 </body>
 </html>
 `
+
+// defaultTitle and defaultDescription are used when the config's 'branding'
+// block is absent or leaves a field empty.
+const (
+	defaultTitle       = "pkgproxy"
+	defaultDescription = "Caching forward proxy for Linux package repositories."
+)
 
 // snippetFuncs maps known repository names to functions that generate
 // package manager configuration snippets for the landing page.
@@ -110,6 +118,29 @@ type repoEntry struct {
 	Mirrors []string
 }
 
+type landingData struct {
+	Title       string
+	Description string
+	Version     string
+	Repos []repoEntry
+}
+
+// brandingOrDefault returns the configured title and description, falling
+// back to the built-in pkgproxy defaults for whichever field is unset.
+func brandingOrDefault(branding *BrandingConfig) (title string, description string) {
+	title, description = defaultTitle, defaultDescription
+	if branding == nil {
+		return title, description
+	}
+	if branding.Title != "" {
+		title = branding.Title
+	}
+	if branding.Description != "" {
+		description = branding.Description
+	}
+	return title, description
+}
+
 // sortedRepos returns repository entries sorted alphabetically by name.
 func sortedRepos(config *RepoConfig) []repoEntry {
 	names := make([]string, 0, len(config.Repositories))
@@ -128,7 +159,7 @@ func sortedRepos(config *RepoConfig) []repoEntry {
 // LandingHandler returns an Echo handler that renders an HTML overview page
 // listing all configured repositories, their mirrors, and package manager snippets.
 // publicAddr is the address (host or host:port) rendered in config snippets.
-func LandingHandler(config *RepoConfig, publicAddr string) echo.HandlerFunc {
+func LandingHandler(config *RepoConfig, publicAddr string, version string) echo.HandlerFunc {
 	funcMap := template.FuncMap{
 		"repoSnippet": func(name string) string {
 			fn, ok := snippetFuncs[name]
@@ -140,9 +171,19 @@ func LandingHandler(config *RepoConfig, publicAddr string) echo.HandlerFunc {
 	}
 	tmpl := template.Must(template.New("landing").Funcs(funcMap).Parse(landingTemplate))
 
+	title, description := brandingOrDefault(config.Branding)
+	repos := sortedRepos(config)
+
 	return func(c *echo.Context) error {
+		data := landingData{
+			Title:       title,
+			Description: description,
+			Version:     version,
+			Repos:       repos,
+		}
+
 		var buf bytes.Buffer
-		if err := tmpl.Execute(&buf, sortedRepos(config)); err != nil {
+		if err := tmpl.Execute(&buf, data); err != nil {
 			return err
 		}
 		c.Response().Header().Set(echo.HeaderContentType, "text/html; charset=UTF-8")
