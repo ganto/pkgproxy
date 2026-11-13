@@ -23,7 +23,7 @@ The **first path segment** of the URL is the repository name (e.g. `/fedora/...`
 
 ## Mirror Failover & Retry (`tryMirrors`)
 
-Mirrors are tried in order. Per mirror, up to `retries` attempts are made (default 1). Exponential backoff (`retryBaseDelay * 2^(attempt-2)`, starting at 1 s) is triggered only on 5xx responses. A single redirect (301/302/303/307/308) is followed per attempt. Connection-level errors skip immediately to the next mirror. The first 200 response wins; otherwise the last non-nil response is returned.
+Mirrors are tried in order. Per mirror, up to `retries` attempts are made (default 1). Exponential backoff (`retryBaseDelay * 2^(attempt-2)`, starting at 1 s) is triggered only on 5xx responses. Up to 10 redirects (301/302/303/307/308) are followed per attempt; HTTPS → HTTP downgrades are rejected, and an exceeded limit or rejected downgrade marks the mirror as failed. Connection-level errors skip immediately to the next mirror. The first 200 response wins; otherwise the last non-nil response is returned.
 
 ## Cache Write Path
 

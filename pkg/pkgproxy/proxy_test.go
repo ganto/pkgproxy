@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	echo "github.com/labstack/echo/v5"
@@ -960,4 +961,146 @@ func TestForwardProxyDefaultRetriesIsOne(t *testing.T) {
 
 	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
 	assert.Equal(t, 1, requestCount, "expected only 1 attempt with default retries")
+}
+
+// --- Multi-hop redirect tests ---
+
+// newRedirectServer returns a server that always redirects to target+path.
+// It increments hits for every request received.
+func newRedirectServer(hits *atomic.Int32, target func(r *http.Request) string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Header().Set("Location", target(r))
+		w.WriteHeader(http.StatusFound)
+	}))
+}
+
+func TestForwardProxyMultiHopRedirect(t *testing.T) {
+	destination := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		fmt.Fprint(w, "multi-hop-body")
+	}))
+	defer destination.Close()
+
+	var hits atomic.Int32
+	hopB := newRedirectServer(&hits, func(r *http.Request) string { return destination.URL + r.URL.Path })
+	defer hopB.Close()
+	hopA := newRedirectServer(&hits, func(r *http.Request) string { return hopB.URL + r.URL.Path })
+	defer hopA.Close()
+
+	pp, cacheDir := newTestProxy(t, []string{hopA.URL + "/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/file.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "multi-hop-body", rec.Body.String())
+	assert.EqualValues(t, 2, hits.Load())
+
+	data, err := os.ReadFile(filepath.Join(cacheDir, "testrepo", "path", "file.rpm"))
+	require.NoError(t, err)
+	assert.Equal(t, "multi-hop-body", string(data))
+}
+
+func TestForwardProxyRedirectLoop(t *testing.T) {
+	var hits atomic.Int32
+	var loop *httptest.Server
+	loop = newRedirectServer(&hits, func(r *http.Request) string { return loop.URL + r.URL.Path })
+	defer loop.Close()
+
+	pp, _ := newTestProxy(t, []string{loop.URL + "/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/file.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+	assert.Empty(t, rec.Header().Get("Location"))
+	assert.EqualValues(t, maxRedirects+1, hits.Load(), "initial request plus maxRedirects hops")
+}
+
+func TestForwardProxyRedirectExactlyMaxHops(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if int(hits.Add(1)) <= maxRedirects {
+			w.Header().Set("Location", "http://"+r.Host+r.URL.Path)
+			w.WriteHeader(http.StatusFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		fmt.Fprint(w, "final-body")
+	}))
+	defer srv.Close()
+
+	pp, _ := newTestProxy(t, []string{srv.URL + "/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/file.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "final-body", rec.Body.String())
+}
+
+func TestForwardProxyRedirectLimitFallsBackToNextMirror(t *testing.T) {
+	var hits atomic.Int32
+	var loop *httptest.Server
+	loop = newRedirectServer(&hits, func(r *http.Request) string { return loop.URL + r.URL.Path })
+	defer loop.Close()
+
+	good := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		fmt.Fprint(w, "second-mirror-body")
+	}))
+	defer good.Close()
+
+	pp, _ := newTestProxy(t, []string{loop.URL + "/", good.URL + "/"})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/file.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "second-mirror-body", rec.Body.String())
+}
+
+func TestForwardProxyRedirectHTTPSDowngradeRejected(t *testing.T) {
+	var plainHits atomic.Int32
+	plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		plainHits.Add(1)
+		fmt.Fprint(w, "plain-body")
+	}))
+	defer plain.Close()
+
+	var tlsHits atomic.Int32
+	secure := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tlsHits.Add(1)
+		w.Header().Set("Location", plain.URL+r.URL.Path)
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer secure.Close()
+
+	pp := New(&PkgProxyConfig{
+		CacheBasePath: t.TempDir(),
+		RepositoryConfig: &RepoConfig{
+			Repositories: map[string]Repository{
+				"testrepo": {CacheSuffixes: []string{".rpm"}, Mirrors: []string{secure.URL + "/"}},
+			},
+		},
+		Transport: secure.Client().Transport,
+	})
+	app := newTestApp(pp)
+
+	req := httptest.NewRequest(http.MethodGet, "/testrepo/path/file.rpm", nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+	assert.EqualValues(t, 1, tlsHits.Load())
+	assert.EqualValues(t, 0, plainHits.Load(), "downgrade target must never be requested")
 }
