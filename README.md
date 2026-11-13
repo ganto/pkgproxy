@@ -7,18 +7,25 @@ fetched transparently from configurable upstream mirrors.
 
 ## Run the code
 
-Build and run the code locally for testing:
+Install and use the tool directly:
+```shell
+go install github.com/ganto/pkgproxy@latest
+pkgproxy --config 'pkgproxy.yaml' --cachedir 'cache' serve
+```
+Fetching the config file from the repository, if needed.
+
+or build and run the code locally for testing:
 ```shell
 PKGPROXY_CONFIG=./configs/pkgproxy.yaml go run github.com/ganto/pkgproxy serve
 ```
 
-Run the application via a container engine (e.g. [Podman](https://podman.io/)):
+or run the application via a container engine (e.g. [Podman](https://podman.io/)):
 
 ```shell
 podman run --rm -p 8080:8080 -e PKGPROXY_HOST=0.0.0.0 --volume ./cache:/ko-app/cache:z ghcr.io/ganto/pkgproxy
 ```
 
-To use a custom `pkgproxy.yaml`, bind-mount it into the container:
+Or use a custom `pkgproxy.yaml`, bind-mount it into the container:
 ```shell
 podman run --rm -p 8080:8080 -e PKGPROXY_HOST=0.0.0.0 --volume ./cache:/ko-app/cache:z --volume ./pkgproxy.yaml:/ko-app/pkgproxy.yaml ghcr.io/ganto/pkgproxy
 ```
