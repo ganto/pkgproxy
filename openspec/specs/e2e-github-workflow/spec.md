@@ -30,15 +30,15 @@ Each matrix job SHALL have a `timeout-minutes` of 5.
 - **THEN** the job is cancelled by GitHub Actions
 
 ### Requirement: Matrix includes all supported distro/release tuples
-The workflow matrix SHALL include the following distro/release tuples: Fedora 43, CentOS Stream 10, AlmaLinux 10, Rocky Linux 10, Debian trixie, Ubuntu noble, Arch Linux latest.
+The workflow matrix SHALL include the following distro/release tuples: Fedora 45, CentOS Stream 10, AlmaLinux 10, Rocky Linux 10, Debian trixie, Ubuntu resolute, Arch Linux latest.
 
 #### Scenario: All distros are represented in the matrix
 - **WHEN** the e2e workflow is triggered
-- **THEN** jobs are created for Fedora 43, CentOS Stream 10, AlmaLinux 10, Rocky Linux 10, Debian trixie, Ubuntu noble, and Arch Linux latest
+- **THEN** jobs are created for Fedora 45, CentOS Stream 10, AlmaLinux 10, Rocky Linux 10, Debian trixie, Ubuntu resolute, and Arch Linux latest
 
 ### Requirement: Workflow job steps
 Each matrix job SHALL checkout the repository, set up Go, and run the e2e test for the specific distro using `go test -tags e2e -run <TestFunction> ./test/e2e/` with the `E2E_RELEASE` environment variable set from the matrix.
 
 #### Scenario: Job executes test with correct parameters
-- **WHEN** a matrix job for Fedora 43 runs
-- **THEN** it executes `go test -tags e2e -run TestFedora ./test/e2e/` with `E2E_RELEASE=43`
+- **WHEN** a matrix job for Fedora 45 runs
+- **THEN** it executes `go test -tags e2e -run TestFedora ./test/e2e/` with `E2E_RELEASE=45`

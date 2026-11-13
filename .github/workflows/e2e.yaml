@@ -52,9 +52,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Fedora 43
+          - name: Fedora 45
             test: TestFedora
-            release: "43"
+            release: "45"
           - name: CentOS Stream 10
             test: TestCentOSStream
             release: "10"
@@ -67,9 +67,9 @@ jobs:
           - name: Debian trixie
             test: TestDebian
             release: trixie
-          - name: Ubuntu noble
+          - name: Ubuntu resolute
             test: TestUbuntu
-            release: noble
+            release: resolute
           - name: Arch Linux latest
             test: TestArch
             release: latest

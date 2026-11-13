@@ -14,7 +14,9 @@ echo "==> Proxy: ${PROXY_ADDR}"
 echo "==> Packages: ${PACKAGES[*]}"
 
 # Remove all default repo files so only the mounted pkgproxy repo is used.
+# Newer Fedora releases ship their stock repos in /usr/share/dnf5/repos.d.
 find /etc/yum.repos.d/ -name '*.repo' ! -name 'pkgproxy-*' -delete
+rm -f /usr/share/dnf5/repos.d/*.repo
 
 echo "==> Repo files:"
 for f in /etc/yum.repos.d/pkgproxy-*.repo; do

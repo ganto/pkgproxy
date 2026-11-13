@@ -210,7 +210,7 @@ func dnfRepoFile(t *testing.T, name string, content string) string {
 }
 
 func TestFedora(t *testing.T) {
-	release := releaseOrDefault("43")
+	release := releaseOrDefault("45")
 	proxyAddr, cacheDir := setupPkgproxy(t)
 
 	repoFile := dnfRepoFile(t, "fedora", fmt.Sprintf(`[fedora]
@@ -414,7 +414,7 @@ gpgcheck=0
 }
 
 func TestUbuntu(t *testing.T) {
-	release := releaseOrDefault("noble")
+	release := releaseOrDefault("resolute")
 	proxyAddr, cacheDir := setupPkgproxy(t)
 
 	sourcesList := filepath.Join(t.TempDir(), "sources.list")
