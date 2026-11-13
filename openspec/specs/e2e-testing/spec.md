@@ -50,11 +50,11 @@ The e2e test package SHALL use a `TestMain` function to build the pkgproxy binar
 - **THEN** each starts a separate pkgproxy process from the shared binary, with its own port and cache directory
 
 ### Requirement: E2E_RELEASE environment variable for release parameterization
-Each top-level e2e test function SHALL read the `E2E_RELEASE` environment variable to determine the distribution release version. If `E2E_RELEASE` is not set, the test SHALL use a sensible default release (e.g., `43` for Fedora, `trixie` for Debian, `noble` for Ubuntu, `10` for CentOS Stream/AlmaLinux/Rocky Linux).
+Each top-level e2e test function SHALL read the `E2E_RELEASE` environment variable to determine the distribution release version. If `E2E_RELEASE` is not set, the test SHALL use a sensible default release (e.g., `45` for Fedora, `trixie` for Debian, `resolute` for Ubuntu, `10` for CentOS Stream/AlmaLinux/Rocky Linux).
 
 #### Scenario: Default release is used when E2E_RELEASE is unset
 - **WHEN** `TestFedora` runs without `E2E_RELEASE` set
-- **THEN** the test uses the default release `43`
+- **THEN** the test uses the default release `45`
 
 #### Scenario: E2E_RELEASE overrides the default
 - **WHEN** `TestFedora` runs with `E2E_RELEASE=42`
@@ -87,7 +87,7 @@ The `make e2e` target SHALL accept optional `DISTRO` and `RELEASE` parameters. W
 - **THEN** only `TestFedora` runs with `E2E_RELEASE=42`
 
 ### Requirement: Fedora e2e test
-The test suite SHALL include a top-level `TestFedora` test function using a `docker.io/library/fedora:<release>` container (where release defaults to `43` or is set via `E2E_RELEASE`). The test SHALL configure dnf to use pkgproxy for the `fedora` repository and include a COPR subtest for `ganto/jo` using the `fedora-$releasever-$basearch` pattern. GPG verification SHALL remain enabled for the base repo, disabled for COPR.
+The test suite SHALL include a top-level `TestFedora` test function using a `docker.io/library/fedora:<release>` container (where release defaults to `45` or is set via `E2E_RELEASE`). The test SHALL configure dnf to use pkgproxy for the `fedora` repository and include a COPR subtest for `ganto/jo` using the `fedora-$releasever-$basearch` pattern. GPG verification SHALL remain enabled for the base repo, disabled for COPR.
 
 #### Scenario: Fedora metadata refresh succeeds
 - **WHEN** the Fedora container runs `dnf makecache` through pkgproxy
