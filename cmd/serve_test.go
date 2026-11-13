@@ -256,6 +256,20 @@ func TestParseTrustProxy(t *testing.T) {
 			wantIP:     "203.0.113.5",
 		},
 		{
+			name:       "zoned link-local peer trusted via explicit CIDR honours XFF",
+			value:      "fe80::/10",
+			remoteAddr: "[fe80::1%eth0]:1234",
+			xff:        "203.0.113.5",
+			wantIP:     "203.0.113.5",
+		},
+		{
+			name:       "zoned link-local peer not trusted by default, zone stripped",
+			value:      "loopback",
+			remoteAddr: "[fe80::1%eth0]:1234",
+			xff:        "203.0.113.5",
+			wantIP:     "fe80::1",
+		},
+		{
 			name:       "combined loopback and CIDR trusts loopback",
 			value:      "loopback,10.0.0.0/8",
 			remoteAddr: "127.0.0.1:1234",
