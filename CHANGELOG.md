@@ -6,11 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/ganto/pkgproxy/commits/HEAD/)
 
+## [v0.3.1](https://github.com/ganto/pkgproxy/releases/tag/v0.3.1) - 2026-11-13
+
 ### Changed
 
 - Upgraded Echo web framework to v5.4.5
 - Strip IPv6 zone from logged client IPs; `--trust-proxy` now matches zoned link-local proxies
 - Reject upstream redirects that downgrade from HTTPS to HTTP
+- Upgrade Fedora and Ubuntu distribution release used for integration tests
 
 ### Fixed
 
