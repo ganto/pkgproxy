@@ -39,6 +39,27 @@ podman run --rm -p 8080:8080 -e PKGPROXY_HOST=0.0.0.0 --volume ./cache:/ko-app/c
 
 Any flag with an env variable listed above can be set via the environment instead of passing the flag.
 
+### Landing page hostname
+
+The config snippets shown on the landing page (`GET /`) need pkgproxy's own
+address, e.g. `baseurl=http://<pkgproxy>/fedora/...`. Rather than relying on a
+server-side setting, this is filled in automatically, with no configuration
+needed:
+
+- **Server-side, from the request's `Host` header.** Every response — including
+  `curl` and other non-browser clients — already contains a working address
+  built from the `Host` header the request itself carried (the same header a
+  reverse proxy forwards by default). No JavaScript required.
+- **Client-side, from the page's own URL.** In a browser, a small inline script
+  additionally corrects the address to `window.location.origin` if it differs
+  from the server-rendered one — which matters behind a reverse proxy that
+  changes the scheme (e.g. TLS termination), since the `Host` header alone
+  can't reveal that.
+
+If a reverse proxy in front of pkgproxy does not forward the original `Host`
+header, `curl` (or a browser with JavaScript disabled) will see whatever host
+pkgproxy itself observed instead.
+
 ### Trusting X-Forwarded-For
 
 By default pkgproxy ignores the `X-Forwarded-For` header and uses the direct connecting IP address for the `remote_ip` access-log field. This is the safe behavior when pkgproxy faces the internet directly or runs in a container without a reverse proxy in front of it.
@@ -68,6 +89,26 @@ Each repository supports the following options:
 | `exclude` | no | List of file names to exclude from caching, even when they match a suffix. Useful with the `"*"` wildcard suffix. |
 | `mirrors` | yes | Ordered list of upstream mirror URLs |
 | `retries` | no | Number of attempts per mirror before moving to the next one (default: `1`) |
+
+### Landing page branding
+
+The top-level `branding` key customizes the title and description shown on the
+landing page (and the HTML `<title>`) served at `/`:
+
+```yaml
+branding:
+  title: Acme Package Mirror
+  description: Internal package cache for Acme Corp.
+
+repositories:
+  ...
+```
+
+Both fields are optional and independent — omitting `branding` entirely, or
+leaving one of the two fields unset, falls back to the default "pkgproxy" title
+and "Caching forward proxy for Linux package repositories." description. The
+landing page also always shows the running pkgproxy version below the
+description.
 
 ### Mirror retries
 

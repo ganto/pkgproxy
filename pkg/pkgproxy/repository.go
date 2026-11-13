@@ -18,7 +18,14 @@ var repoHandleRegexp = regexp.MustCompile("^[a-zA-Z0-9_~.-]*$")
 
 // RepoConfig defines the upstream package repositories
 type RepoConfig struct {
+	Branding     *BrandingConfig       `yaml:"branding,omitempty"`
 	Repositories map[string]Repository `yaml:"repositories"`
+}
+
+// BrandingConfig customizes the title and description shown on the landing page.
+type BrandingConfig struct {
+	Title       string `yaml:"title,omitempty"`
+	Description string `yaml:"description,omitempty"`
 }
 
 type Repository struct {

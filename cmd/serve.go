@@ -166,7 +166,7 @@ func parseTrustProxy(value string) (echo.IPExtractor, error) {
 
 // newEchoApp wires up the Echo application: IP extraction, middleware chain,
 // the landing page route and the caching forward proxy.
-func newEchoApp(cacheBasePath string, config *pkgproxy.RepoConfig, publicAddr string, extractor echo.IPExtractor) *echo.Echo {
+func newEchoApp(cacheBasePath string, config *pkgproxy.RepoConfig, publicAddr string, extractor echo.IPExtractor, version string) *echo.Echo {
 	app := pkgproxy.NewEcho()
 	// Extract client IP from X-Forwarded-For only when a trusted proxy is explicitly configured
 	// via --trust-proxy. By default, XFF is ignored and the direct connecting IP is used.
@@ -211,7 +211,7 @@ func newEchoApp(cacheBasePath string, config *pkgproxy.RepoConfig, publicAddr st
 		CacheBasePath:    cacheBasePath,
 		RepositoryConfig: config,
 	})
-	app.GET("/", pkgproxy.LandingHandler(config, publicAddr))
+	app.GET("/", pkgproxy.LandingHandler(config, publicAddr, version))
 	app.Use(pkgProxy.Cache)
 	app.Use(pkgProxy.ForwardProxy)
 
@@ -237,7 +237,7 @@ func startServer(_ *cobra.Command, _ []string) error {
 	slog.Info("trust-proxy", "value", trustProxyLog)
 
 	publicAddr := resolvePublicAddr(publicHost, listenAddress, listenPort)
-	app := newEchoApp(cacheDir, &repoConfig, publicAddr, ipExtractor)
+	app := newEchoApp(cacheDir, &repoConfig, publicAddr, ipExtractor, Version)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

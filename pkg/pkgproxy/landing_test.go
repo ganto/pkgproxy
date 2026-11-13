@@ -17,6 +17,12 @@ func newLandingApp(config *RepoConfig, publicAddr string) *echo.Echo {
 	return app
 }
 
+func newLandingAppWithVersion(config *RepoConfig, publicAddr string, version string) *echo.Echo {
+	app := echo.New()
+	app.GET("/", LandingHandler(config, publicAddr, version))
+	return app
+}
+
 func getLandingBody(t *testing.T, app *echo.Echo) string {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -65,6 +71,62 @@ func TestLandingHandlerMirrorLinks(t *testing.T) {
 	body := getLandingBody(t, newLandingApp(config, "localhost:8080"))
 
 	assert.Contains(t, body, `<a href="https://mirror.example.com/fedora/">https://mirror.example.com/fedora/</a>`)
+}
+
+func TestLandingHandlerDefaultBranding(t *testing.T) {
+	config := &RepoConfig{
+		Repositories: map[string]Repository{
+			"fedora": {CacheSuffixes: []string{".rpm"}, Mirrors: []string{"https://mirror.example.com/"}},
+		},
+	}
+	body := getLandingBody(t, newLandingApp(config))
+
+	assert.Contains(t, body, "<title>pkgproxy</title>")
+	assert.Contains(t, body, "<h1>pkgproxy</h1>")
+	assert.Contains(t, body, "<p>Caching forward proxy for Linux package repositories.</p>")
+}
+
+func TestLandingHandlerCustomBranding(t *testing.T) {
+	config := &RepoConfig{
+		Branding: &BrandingConfig{
+			Title:       "Acme Package Mirror",
+			Description: "Internal package cache for Acme Corp.",
+		},
+		Repositories: map[string]Repository{
+			"fedora": {CacheSuffixes: []string{".rpm"}, Mirrors: []string{"https://mirror.example.com/"}},
+		},
+	}
+	body := getLandingBody(t, newLandingApp(config))
+
+	assert.Contains(t, body, "<title>Acme Package Mirror</title>")
+	assert.Contains(t, body, "<h1>Acme Package Mirror</h1>")
+	assert.Contains(t, body, "<p>Internal package cache for Acme Corp.</p>")
+	assert.NotContains(t, body, "pkgproxy</h1>")
+}
+
+func TestLandingHandlerBrandingPartialOverride(t *testing.T) {
+	config := &RepoConfig{
+		Branding: &BrandingConfig{Title: "Acme Package Mirror"},
+		Repositories: map[string]Repository{
+			"fedora": {CacheSuffixes: []string{".rpm"}, Mirrors: []string{"https://mirror.example.com/"}},
+		},
+	}
+	body := getLandingBody(t, newLandingApp(config))
+
+	assert.Contains(t, body, "<h1>Acme Package Mirror</h1>")
+	// Description falls back to the default when only the title is customized.
+	assert.Contains(t, body, "<p>Caching forward proxy for Linux package repositories.</p>")
+}
+
+func TestLandingHandlerVersion(t *testing.T) {
+	config := &RepoConfig{
+		Repositories: map[string]Repository{
+			"fedora": {CacheSuffixes: []string{".rpm"}, Mirrors: []string{"https://mirror.example.com/"}},
+		},
+	}
+	body := getLandingBody(t, newLandingAppWithVersion(config, "localhost:8080", "v0.3.1"))
+
+	assert.Contains(t, body, "<p>pkgproxy v0.3.1</p>")
 }
 
 func TestLandingHandlerKnownSnippets(t *testing.T) {
