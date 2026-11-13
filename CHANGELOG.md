@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Upgraded Echo web framework to v5.4.4
+- Upgraded Echo web framework to v5.4.5
 - Reject upstream redirects that downgrade from HTTPS to HTTP
 
 ### Fixed
