@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/ganto/pkgproxy/commits/HEAD/)
 
+### Changed
+
+- Reject upstream redirects that downgrade from HTTPS to HTTP
+
+### Fixed
+
+- Follow multi-hop upstream redirects, restoring package caching for Fedora COPR repositories
+
 ## [v0.3.0](https://github.com/ganto/pkgproxy/releases/tag/v0.3.0) - 2026-08-29
 
 ### Added

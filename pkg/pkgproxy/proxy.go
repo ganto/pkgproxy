@@ -104,6 +104,9 @@ var (
 	// Base delay for exponential backoff between retry attempts (1s, 2s, 4s, ...)
 	retryBaseDelay = 1 * time.Second
 
+	// Maximum number of redirect hops followed per mirror attempt
+	maxRedirects = 10
+
 	// Status codes which will trigger a new request to the "Location" header
 	redirectStatusCodes = []int{
 		301,
@@ -327,9 +330,10 @@ func (pp *pkgProxy) ForwardProxy(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
-// tryMirrors iterates the mirrors for repo in order, following one redirect per mirror,
-// and returns the first 200 response. Each mirror is attempted up to the configured
-// number of retries (useful when a redirector like download.fedoraproject.org sends
+// tryMirrors iterates the mirrors for repo in order, following up to maxRedirects
+// redirects per mirror attempt (HTTPS to HTTP downgrades are rejected), and returns
+// the first 200 response. Each mirror is attempted up to the configured number of
+// retries (useful when a redirector like download.fedoraproject.org sends
 // traffic to a broken mirror — retrying may yield a different, working mirror).
 // If no mirror returns 200, the last non-nil response (possibly non-200) is returned
 // with a nil error. A non-nil error is only returned when the last mirror attempt
@@ -362,34 +366,46 @@ func (pp *pkgProxy) tryMirrors(ctx context.Context, rid string, req *http.Reques
 			}
 
 			upstreamPath := path.Join(mirror.Path, strings.TrimPrefix(req.URL.Path, "/"+repo))
-			rsp, err = pp.forwardClientRequestToOrigin(ctx, rid, req, &url.URL{
+			target := &url.URL{
 				Scheme:   mirror.Scheme,
 				Host:     mirror.Host,
 				Path:     upstreamPath,
 				RawQuery: req.URL.RawQuery,
-			}, reqBody)
+			}
+			rsp, err = pp.forwardClientRequestToOrigin(ctx, rid, req, target, reqBody)
 			if err != nil {
 				slog.Warn("upstream request failed", "request_id", rid, "mirror_index", i, "attempt", attempt, "error", err)
 				break // connection-level error, skip to next mirror
 			}
 			slog.Info("upstream response", "request_id", rid, "status", rsp.Status, "headers", rsp.Header)
 
-			// Follow HTTP redirects.
-			if utils.Contains(redirectStatusCodes, rsp.StatusCode) {
+			// Follow HTTP redirects up to maxRedirects hops.
+			for hop := 0; utils.Contains(redirectStatusCodes, rsp.StatusCode); hop++ {
 				location, locErr := rsp.Location()
 				_ = rsp.Body.Close()
 				rsp = nil
-				if locErr != nil {
+				switch {
+				case locErr != nil:
 					err = locErr
+				case hop == maxRedirects:
+					err = fmt.Errorf("stopped after %d redirects", maxRedirects)
+				case target.Scheme == "https" && location.Scheme == "http":
+					err = fmt.Errorf("refusing redirect from %s to %s: HTTPS to HTTP downgrade", target.Redacted(), location.Redacted())
+				}
+				if err != nil {
 					slog.Warn("upstream request failed", "request_id", rid, "mirror_index", i, "attempt", attempt, "error", err)
 					break // bad redirect, skip to next mirror
 				}
-				rsp, err = pp.forwardClientRequestToOrigin(ctx, rid, req, location, reqBody)
+				target = location
+				rsp, err = pp.forwardClientRequestToOrigin(ctx, rid, req, target, reqBody)
 				if err != nil {
 					slog.Warn("upstream request failed", "request_id", rid, "mirror_index", i, "attempt", attempt, "error", err)
 					break // connection-level error, skip to next mirror
 				}
 				slog.Info("upstream response", "request_id", rid, "status", rsp.Status, "headers", rsp.Header)
+			}
+			if rsp == nil {
+				break
 			}
 
 			if rsp.StatusCode == http.StatusOK {
