@@ -60,3 +60,44 @@ func TestValidateConfigWildcardAloneNoWarning(t *testing.T) {
 
 	assert.Empty(t, buf.String())
 }
+
+func TestLoadConfigBranding(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "pkgproxy.yaml")
+	require.NoError(t, os.WriteFile(configPath, []byte(`---
+branding:
+  title: Acme Package Mirror
+  description: Internal package cache for Acme Corp.
+repositories:
+  fedora:
+    suffixes:
+      - .rpm
+    mirrors:
+      - https://mirror.example.com/
+`), 0o600))
+
+	var config RepoConfig
+	require.NoError(t, LoadConfig(&config, configPath))
+
+	require.NotNil(t, config.Branding)
+	assert.Equal(t, "Acme Package Mirror", config.Branding.Title)
+	assert.Equal(t, "Internal package cache for Acme Corp.", config.Branding.Description)
+}
+
+func TestLoadConfigNoBranding(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "pkgproxy.yaml")
+	require.NoError(t, os.WriteFile(configPath, []byte(`---
+repositories:
+  fedora:
+    suffixes:
+      - .rpm
+    mirrors:
+      - https://mirror.example.com/
+`), 0o600))
+
+	var config RepoConfig
+	require.NoError(t, LoadConfig(&config, configPath))
+
+	assert.Nil(t, config.Branding)
+}

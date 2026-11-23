@@ -1,4 +1,8 @@
 ---
+branding:
+  title: Pkgproxy Application
+  description: Caching forward proxy for Linux package repositories
+  
 repositories:
   almalinux:
     suffixes:
